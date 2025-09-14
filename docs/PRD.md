@@ -33,12 +33,23 @@ AI-powered summaries:
     Faculty profile summary ( derived from publications and biography from orcid id, Google Scholar, etc). 
 Deploy on AWS EC2 with GitHub Actions CI/CD. 
 
+
+Long-Term Functionality:
+
+Metadata for Dead Nodes – Retain and display metadata even for inactive or missing nodes (e.g., publications removed from source, incomplete faculty profiles).
+Graph Expansion – Support additional graphs such as:
+    Professor collaboration networks.
+    Domains and categories of research papers.
+Beyond IISc Faculty – Extend ScholarSphere to include faculty from other universities and institutes, enabling cross-institute collaboration exploration.
+
+
 Non-Goals : 
 
 Automated download of restricted/full PDFs. 
 Uploading new papers by users. 
 No recommendation based on collaboration patterns. 
 Not including paper-to-paper citation graphs. 
+
 
 Assumptions :
 
@@ -97,7 +108,7 @@ Portability: Dockerized services for easy deployment.
 
 High-Level Architecture: 
 
-[Data Sources: DBLP, ORCID, Google scholar] 
+[Data Sources: DBLP, ORCID, etc] 
         ↓ 
  [Scraper Service ] 
         ↓ 
@@ -164,35 +175,63 @@ User acceptance tests:
     Confirm deployment accessibility. 
 
 11. Future Enhancement 
-Graph nodes also include domain as a node. 
 Agentic scraping for institute website to get professor’s profile, lab work, current events of department. 
 D3.js for more diverse visualizations of the data 
  
 
 12. Weekly Milestones 
 
-Week Ending :Goals / Milestones 
-Fri 12 Sep:
-Project Proposal Presentation: Finalize scope, architecture, PRD, and tech stack. 
- 
-Fri 19 Sep:
-Scraper development complete; basic dataset for faculty loaded. 
-Fri 26 Sep: 
-Neo4j schema designed; backend APIs for graph retrieval implemented. 
-Fri 3 Oct: 
-Frontend skeleton + Cytoscape.js graph integration; filters applied. 
-Fri 10 Oct :
-Midterm Review: 67% feature completion. Graph functional with filters and basic metadata display and AI summarization service integrated; paper and faculty summaries functional. 
- 
- 
-Fri 17 Oct: 
-Updation of features according to the midterm review. 
-Fri 24 Oct: 
-Testing of features: Unit testing, UI polish. 
-Fri 31 Oct: 
-Testing of features: Functional testing. 
-Fri 7 Nov: 
-Final Submission: Deployment verified on AWS. 
+Week 1 (12–18 Sep): 
+    Finalize scope, PRD, and tech stack.
+    Set up project repo, GitHub Actions initial pipeline.
+    Begin scraper prototype for DBLP (basic author → papers).
+
+Week 2 (19–26 Sep):
+    Extend scraper to ORCID, integrate with cleaning/validation module.
+    Draft Neo4j schema (Author, Paper, Co-author relationships).
+    Draft Postgres schema for summaries.
+    Load initial dataset into Neo4j.
+
+Week 3 (27 Sep – 3 Oct):
+    Implement Spring Boot API stubs (/api/graph, /api/faculty, /api/paper).
+    Connect APIs to Neo4j/Postgres.
+    Build test dataset queries for validation.
+
+Week 4 (4–10 Oct):
+    Integrate AI summarizer (abstract → short summary).
+    Add faculty profile summary (from ORCID + Google Scholar).
+    Write unit tests for scraper, APIs, summarizer.
+    Midterm Review checkpoint: base features demo.
+
+Week 5 (11–17 Oct):
+    Frontend skeleton: React/Thymeleaf layout.
+    Integrate Cytoscape.js with backend API data.
+    Implement graph rendering of sample dataset.
+
+Week 6 (18–24 Oct):
+    Add filters (year, department, professor) to visualization.
+    Persist summaries in Postgres (reduce repeated API calls).
+    Perform integration testing (scraper → DB → API → frontend).
+
+Week 7 (25–31 Oct):
+    Implement incremental/lazy loading for graph visualization.
+    Add Neo4j indexes for query optimization.
+    Conduct system testing with extended dataset (10–15 professors).
+
+Week 8 (1–7 Nov):
+    Full dataset ingestion and performance testing.
+    UI polish: tooltips, legends, accessibility features.
+    Prepare system testing report.
+
+Week 9 (8–14 Nov):
+    Dockerize backend + frontend services.
+    Finalize GitHub Actions CI/CD → AWS EC2.
+    Conduct pre-deployment load testing.
+
+Week 10 (15–21 Nov):
+    User Acceptance Testing (faculty/researchers demo).
+    Fix UAT feedback, final polish.
+    Final presentation + submission. 
  
  
 13. Responsibilities 
