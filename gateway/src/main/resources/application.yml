@@ -1,0 +1,15 @@
+server:
+  port: 8081   # Gateway port
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: graph-service
+          uri: http://localhost:8080   # your graph-service
+          predicates:
+            - Path=/api/graph/**, /api/professor/**, /api/paper/**
+          filters:
+            - StripPrefix=1
