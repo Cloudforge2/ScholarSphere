@@ -6,6 +6,25 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+
+//lombok annotations
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+/**
+ * @Data is a shortcut annotation that bundles the features of
+ * @Getter, @Setter, @ToString, @EqualsAndHashCode, and @RequiredArgsConstructor
+ * all in one.
+ *
+ * @NoArgsConstructor is often required by frameworks like Spring Data / JPA
+ * to create instances of the entity.
+ *
+ * @AllArgsConstructor creates a constructor with all fields, which can be useful.
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Node("Institution")
 public class Institution {
 

@@ -5,29 +5,23 @@ import org.springframework.data.neo4j.core.schema.Id;
 import org.springframework.data.neo4j.core.schema.RelationshipProperties;
 import org.springframework.data.neo4j.core.schema.TargetNode;
 
+import com.scholarsphere.graphservice.projection.DehydratedInstitution;
+
+import lombok.AllArgsConstructor;
+import lombok.Value;
+
 import java.util.List;
 
+@Value
+@AllArgsConstructor
 @RelationshipProperties
 public class Affiliation {
 
-    private final List<Integer> years;
-    @Id
-    @GeneratedValue // <-- ADD THESE TWO ANNOTATIONS
-    private Long id;
+     @Id @GeneratedValue
+    Long id;
+
+    List<Integer> years;
+
     @TargetNode
-    private final Institution institution;
-
-    // Constructor, getters
-    public Affiliation(List<Integer> years, Institution institution) {
-        this.years = years;
-        this.institution = institution;
-    }
-
-    public List<Integer> getYears() {
-        return years;
-    }
-
-    public Institution getInstitution() {
-        return institution;
-    }
+    DehydratedInstitution institution;
 }
