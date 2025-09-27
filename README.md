@@ -1,10 +1,6 @@
-Of course. Integrating the Docker workflow is a great idea. Here is the complete, updated `README.md` file that includes all the sections in a logical order.
 
----
+# ScholarSphere Backend
 
-# [Your Project Name]
-
-A brief description of what this project does. It is a Spring Boot application that connects to a Neo4j database and is optimized for containerized deployment with Docker.
 
 ## Development Progress
 
