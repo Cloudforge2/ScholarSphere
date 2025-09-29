@@ -16,13 +16,16 @@ This project is currently under active development. Here is a summary of the cur
 
 ### Next Steps
 - [ ] **Data Access Layer:**
-  - [ ] Implement Getter and Setter methods for all entities.
-  - [ ] Create Spring Data Neo4j repositories for `Author`, `Institution`, and `Work`.
+  - [x] Implement Getter and Setter methods for all entities.(used lombok)
+  - [x] Create Spring Data Neo4j repositories for `Author`, `Institution`, and `Work`.
 - [ ] **Service Layer:**
-  - [ ] Develop service classes to handle business logic.
-  - [ ] Implement methods for creating, retrieving, updating, and deleting entities.
+  - [ ] Author services
+  - [ ] Work services
+  - [ ] Intitution services
 - [ ] **API Layer:**
-  - [ ] Create REST controllers to expose endpoints for the application's features.
+  - [ ] Author endpoints
+  - [ ] Work endpoints
+  - [ ] Instition endpoints
 - [ ] **Testing:**
   - [ ] Write unit tests for the service layer.
   - [ ] Write integration tests for the repository and controller layers.
