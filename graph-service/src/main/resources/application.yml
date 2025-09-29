@@ -1,9 +1,10 @@
 spring:
-  data:
-    neo4j:
-      uri: neo4j+s://f06161fc.databases.neo4j.io
+  
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
       username: neo4j
-      password: 12345678
+      password: ${NEO4J_PASSWORD}
   jpa:
     show-sql: true
     properties:

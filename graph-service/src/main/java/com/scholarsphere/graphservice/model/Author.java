@@ -53,8 +53,8 @@ public class Author {
     private LocalDate createdDate;
     private LocalDate updatedDate;
 
-    @Property("summary_stats")
-    private SummaryStats summaryStats;
+    // @Property("summary_stats")
+    // private SummaryStats summaryStats;
 
     
     private List<CountsByYear> countsByYear;
@@ -69,14 +69,14 @@ public class Author {
     // @Relationship(type = "HAS_CONCEPT")
     // private List<ConceptAssociation> concepts; // x_concepts (deprecated)
 
-    // Getters and Setters...
+ 
 
-    public static class SummaryStats {
-        private Double twoYearMeanCitedness;
-        private Integer hIndex;
-        private Integer i10Index;
-        // Getters and Setters...
-    }
+    // public static class SummaryStats {
+    //     private Double twoYearMeanCitedness;
+    //     private Integer hIndex;
+    //     private Integer i10Index;
+        
+    // }
 
    
 
@@ -91,7 +91,7 @@ public class Author {
     //     // private Concept concept;
 
     //     private Double score; // association strength
-    //     // Getters and Setters...
+
     // }
 
 //     @Node

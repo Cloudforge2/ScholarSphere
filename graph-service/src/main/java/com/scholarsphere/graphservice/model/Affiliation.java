@@ -17,7 +17,7 @@ import java.util.List;
 @RelationshipProperties
 public class Affiliation {
 
-     @Id @GeneratedValue
+    @Id @GeneratedValue
     Long id;
 
     List<Integer> years;
