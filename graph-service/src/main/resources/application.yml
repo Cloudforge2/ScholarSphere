@@ -1,7 +1,14 @@
 spring:
   neo4j:
-    uri: neo4j+s://f06161fc.databases.neo4j.io
-    username: neo4j
-    password: 12345678
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: 12345678
+
 server:
   port: 8080
+
+management:
+  health:
+    neo4j:
+      enabled: false
