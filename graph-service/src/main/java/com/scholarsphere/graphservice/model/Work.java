@@ -66,10 +66,10 @@ public class Work {
     private List<Authorship> authorships;
 
     @Relationship(type = "RELATED_TO", direction = Relationship.Direction.OUTGOING)
-    private List<Work> relatedWorks;
+    private List<String> relatedWorks;
 
     @Relationship(type = "REFERENCES", direction = Relationship.Direction.OUTGOING)
-    private List<Work> referencedWorks;
+    private List<String> referencedWorks;
 
     // @Relationship(type = "HAS_CONCEPT", direction = Relationship.Direction.OUTGOING)
     // private List<Concept> concepts;
