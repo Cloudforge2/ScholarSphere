@@ -3,7 +3,8 @@ package com.scholarsphere.graphservice.model;
 import org.springframework.data.neo4j.core.schema.Id;
 import org.springframework.data.neo4j.core.schema.Node;
 
-@Node("Paper")
+// @Node("Paper")
+@Node("Work")  // Changed label from Paper to Work
 public class Paper {
 
     @Id
