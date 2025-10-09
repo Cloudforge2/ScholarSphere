@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+requests
+beautifulsoup4
+keybert
+transformers
+torch
+sentence-transformers
+

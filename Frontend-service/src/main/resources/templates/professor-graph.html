@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Professor Graph - ScholarSphere</title>
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+            background: #f9fafb;
+        }
+        body::before {
+            content: "";
+            display: none;
+        }
+        header {
+            background-color: #2563eb;
+            color: white;
+            padding: 20px 40px;
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        #graph-container {
+            width: 95%;
+            height: calc(100vh - 150px);
+            margin: 20px auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            position: relative;
+            z-index: 1;
+        }
+        #loadMoreBtn {
+            display: block;
+            margin: 20px auto 30px auto;
+            background: #3b82f6;
+            color: white;
+            font-weight: bold;
+            padding: 14px 32px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: 0.2s ease;
+        }
+        #loadMoreBtn:hover {
+            background: #2563eb;
+        }
+        #loadMoreBtn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+<header>Professor Graph Visualization</header>
+
+<div id="graph-container"></div>
+<button id="loadMoreBtn">Load Next 10 Papers</button>
+
+<script th:inline="javascript">
+/*<![CDATA[*/
+document.addEventListener('DOMContentLoaded', function() {
+
+    // Parse graph data from Thymeleaf model
+    let graphData = /*[[${graphJson}]]*/ '{"nodes":[],"edges":[]}';
+    if (typeof graphData === "string") graphData = JSON.parse(graphData);
+
+    const profNode = graphData.nodes.find(n => n.data.type === "prof");
+    const allPaperNodes = graphData.nodes.filter(n => n.data.type === "paper");
+    const edges = graphData.edges;
+
+    const pageSize = 10;
+    let currentPage = 0;
+    const totalPages = Math.ceil(allPaperNodes.length / pageSize);
+
+    // Initialize Cytoscape
+    const cy = cytoscape({
+        container: document.getElementById('graph-container'),
+        style: [
+            { selector: 'node[type="prof"]', style: {
+                'background-color': '#2563eb',
+                'label': 'data(label)',
+                'color': 'white',
+                'font-size': 14,
+                'text-valign': 'center',
+                'text-halign': 'center',
+                'shape': 'ellipse',
+                'width': 80,
+                'height': 80,
+                'text-wrap': 'wrap',
+                'text-max-width': 70
+            }},
+            { selector: 'node[type="paper"]', style: {
+                'background-color': '#34d399',
+                'label': 'data(label)',
+                'color': 'black',
+                'font-size': 12,
+                'text-valign': 'center',
+                'text-halign': 'center',
+                'shape': 'round-rectangle',
+                'width': 100,
+                'height': 50,
+                'text-wrap': 'wrap',
+                'text-max-width': 90
+            }},
+            { selector: 'edge', style: {
+                'width': 2,
+                'line-color': '#6b7280',
+                'curve-style': 'bezier'
+            }}
+        ],
+        elements: [], // start empty
+        layout: { name: 'preset' }
+    });
+
+    function renderPage(page) {
+        cy.elements().remove(); // clear previous nodes & edges
+
+        // Add professor node
+        cy.add(profNode);
+
+        const start = page * pageSize;
+        const end = start + pageSize;
+        const pageNodes = allPaperNodes.slice(start, end);
+
+        // Add edges connecting prof to page nodes
+        const pageEdges = edges.filter(e =>
+            pageNodes.some(p => p.data.id === e.data.target) &&
+            e.data.source === profNode.data.id
+        );
+
+        cy.add(pageNodes);
+        cy.add(pageEdges);
+
+        // Layout
+        cy.layout({
+            name: 'concentric',
+            animate: true,
+            fit: true,
+            padding: 100,
+            concentric: node => node.data('type') === 'prof' ? 2 : 1,
+            levelWidth: () => 1
+        }).run();
+
+        cy.center(profNode);
+
+        // Update button
+        const btn = document.getElementById('loadMoreBtn');
+        currentPage++;
+        if (currentPage >= totalPages) {
+            btn.disabled = true;
+            btn.textContent = "All Papers Loaded";
+        }
+    }
+
+    // Render first page
+    renderPage(0);
+
+    // Button click
+    document.getElementById('loadMoreBtn').addEventListener('click', () => {
+        renderPage(currentPage);
+    });
+
+    // Node click
+    cy.on('tap', 'node', evt => {
+        const node = evt.target;
+        const label = node.data('label');
+        const type = node.data('type');
+        if (type === 'prof') {
+            window.location.href = '/professor-summary?name=' + encodeURIComponent(label);
+        } else if (type === 'paper') {
+            window.location.href = '/paper-summary?title=' + encodeURIComponent(label);
+        }
+    });
+
+});
+/*]]>*/
+</script>
+</body>
+</html>
