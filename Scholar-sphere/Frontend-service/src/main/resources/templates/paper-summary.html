@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="'Paper Summary - ' + ${title}">Paper Summary - ScholarSphere</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f0f4f8;
+        }
+        header {
+            background-color: #2563eb;
+            color: white;
+            padding: 20px 40px;
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        h2 {
+            color: #1f2937;
+        }
+        p {
+            font-size: 16px;
+            color: #4b5563;
+            line-height: 1.6;
+        }
+        .meta-info {
+            margin: 15px 0;
+            color: #374151;
+        }
+        .coauthors-list {
+            margin-top: 20px;
+        }
+        .coauthor-item {
+            background: #d1fae5;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    Paper Summary
+</header>
+
+<div class="container">
+    <h2 th:text="${title}">Paper Title</h2>
+
+    <!-- Paper Metadata -->
+    <div class="meta-info">
+        <p><strong>Venue:</strong> <span th:text="${venue}">Unknown Venue</span></p>
+        <p><strong>Year:</strong> <span th:text="${year}">Unknown Year</span></p>
+        <p th:if="${citations != null}">
+            <strong>Citations:</strong> <span th:text="${citations}">0</span>
+        </p>
+    </div>
+
+    <!-- Abstract -->
+    <h3>Abstract</h3>
+    <p th:text="${abstract}">Abstract not available.</p>
+
+    <!-- Coauthors -->
+    <div class="coauthors-list" th:if="${paper != null and paper.authors != null}">
+        <h3>Coauthors:</h3>
+        <div th:each="author : ${paper.authors}" class="coauthor-item"
+             th:text="${author.displayName}">
+            Coauthor Name
+        </div>
+    </div>
+
+    <div th:if="${paper == null or paper.authors == null or #lists.isEmpty(paper.authors)}">
+        <p><em>No coauthors found for this paper.</em></p>
+    </div>
+</div>
+
+</body>
+</html>

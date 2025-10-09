@@ -1,0 +1,8 @@
+spring:
+  neo4j:
+    uri: bolt://neo4j-scrappy:7687
+    authentication:
+      username: neo4j
+      password: test123!
+server:
+  port: 8082

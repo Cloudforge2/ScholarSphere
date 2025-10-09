@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Professor Graph - ScholarSphere</title>
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+            background: #f9fafb;
+        }
+        header {
+            background-color: #2563eb;
+            color: white;
+            padding: 20px 40px;
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        #graph-container {
+            width: 95%;
+            height: calc(100vh - 200px);
+            margin: 20px auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            position: relative;
+            z-index: 1;
+        }
+        .pagination-btn {
+            display: inline-block;
+            margin: 20px 10px 30px 10px;
+            background: #3b82f6;
+            color: white;
+            font-weight: bold;
+            padding: 12px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: 0.2s ease;
+        }
+        .pagination-btn:hover {
+            background: #2563eb;
+        }
+        .pagination-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .pagination-container {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<header>Professor Graph Visualization</header>
+
+<div id="graph-container"></div>
+<div class="pagination-container">
+    <button id="prevBtn" class="pagination-btn" disabled>Previous</button>
+    <button id="nextBtn" class="pagination-btn">Next</button>
+</div>
+
+<script th:inline="javascript">
+/*<![CDATA[*/
+document.addEventListener('DOMContentLoaded', function() {
+
+    let graphData = /*[[${graphJson}]]*/ '{"nodes":[],"edges":[]}';
+    if (typeof graphData === "string") graphData = JSON.parse(graphData);
+
+    const profNode = graphData.nodes.find(n => n.data.type === "prof");
+    const allPaperNodes = graphData.nodes.filter(n => n.data.type === "paper");
+    const edges = graphData.edges;
+
+    const pageSize = 10;
+    let currentPage = 0;
+    const totalPages = Math.ceil(allPaperNodes.length / pageSize);
+
+    const cy = cytoscape({
+        container: document.getElementById('graph-container'),
+        style: [
+            { selector: 'node[type="prof"]', style: {
+                'background-color': '#2563eb',
+                'label': 'data(label)',
+                'color': 'white',
+                'font-size': 14,
+                'text-valign': 'center',
+                'text-halign': 'center',
+                'shape': 'ellipse',
+                'width': 80,
+                'height': 80,
+                'text-wrap': 'wrap',
+                'text-max-width': 70
+            }},
+            { selector: 'node[type="paper"]', style: {
+                'background-color': '#34d399',
+                'label': 'data(label)',
+                'color': 'black',
+                'font-size': 12,
+                'text-valign': 'center',
+                'text-halign': 'center',
+                'shape': 'round-rectangle',
+                'width': 100,
+                'height': 50,
+                'text-wrap': 'wrap',
+                'text-max-width': 90
+            }},
+            { selector: 'edge', style: {
+                'width': 2,
+                'line-color': '#6b7280',
+                'curve-style': 'bezier'
+            }}
+        ],
+        elements: [],
+        layout: { name: 'preset' }
+    });
+
+    function renderPage(page) {
+        cy.elements().remove();
+
+        cy.add(profNode);
+
+        const start = page * pageSize;
+        const end = start + pageSize;
+        const pageNodes = allPaperNodes.slice(start, end);
+
+        const pageEdges = edges.filter(e =>
+            pageNodes.some(p => p.data.id === e.data.target) &&
+            e.data.source === profNode.data.id
+        );
+
+        cy.add(pageNodes);
+        cy.add(pageEdges);
+
+        cy.layout({
+            name: 'concentric',
+            animate: true,
+            fit: true,
+            padding: 100,
+            concentric: node => node.data('type') === 'prof' ? 2 : 1,
+            levelWidth: () => 1
+        }).run();
+
+        cy.center(profNode);
+
+        // Update buttons
+        document.getElementById('prevBtn').disabled = currentPage === 0;
+        document.getElementById('nextBtn').disabled = currentPage >= totalPages - 1;
+    }
+
+    renderPage(currentPage);
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+        if (currentPage < totalPages - 1) {
+            currentPage++;
+            renderPage(currentPage);
+        }
+    });
+
+    document.getElementById('prevBtn').addEventListener('click', () => {
+        if (currentPage > 0) {
+            currentPage--;
+            renderPage(currentPage);
+        }
+    });
+
+    cy.on('tap', 'node', evt => {
+        const node = evt.target;
+        const label = node.data('label');
+        const type = node.data('type');
+        if (type === 'prof') {
+            window.location.href = '/professor-summary?name=' + encodeURIComponent(label);
+        } else if (type === 'paper') {
+            window.location.href = '/paper-summary?title=' + encodeURIComponent(label);
+        }
+    });
+
+});
+/*]]>*/
+</script>
+</body>
+</html>
