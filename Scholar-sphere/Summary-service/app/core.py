@@ -1,384 +1,357 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Author Profile System with Summary & Co-authors
+Enhanced Author Profile System with llama based model Summaries
+Features:
+- Fetches author info and top papers from OpenAlex
+- Fetches abstracts from Semantic Scholar in parallel
+- Generates detailed author summaries using LLama3.1 model 
+- Falls back to rule-based summary if LLM fails
+- Shows author metrics and affiliations
 """
 
 import requests
-import time
-from collections import Counter
+import asyncio
+import aiohttp
 import re
+import ollama
+from typing import List
+from collections import Counter
 
-# ================================================================
-#                      SETUP AND HELPERS
-# ================================================================
+# -----------------------------
+# LLM Configuration
+# -----------------------------
+LLM_MODEL = "llama3.1:8b"
 
-def safe_request(url, retries=3, delay=2):
-    """Safe API request with retry logic"""
-    for i in range(retries):
-        try:
-            r = requests.get(url, timeout=15)
-            if r.status_code == 200:
-                return r.json()
-        except Exception as e:
-            print(f"⚠️ Error fetching {url}: {e}")
-        time.sleep(delay)
-    return {}
+# -----------------------------
+# OpenAlex Author & Paper Fetching
+# -----------------------------
+def fetch_author_candidates(author_name: str, max_results: int = 10):
+    """Fetch multiple author candidates from OpenAlex."""
+    url = f"https://api.openalex.org/authors?search={author_name}&per-page={max_results}"
+    r = requests.get(url)
+    r.raise_for_status()
+    authors = r.json().get("results", [])
+    return authors
 
-def decode_openalex_abstract(inv_idx):
-    """Decode OpenAlex inverted_index abstract"""
-    if not inv_idx:
-        return ""
-    try:
-        arr = [""] * (max(max(v) for v in inv_idx.values()) + 1)
-        for word, idxs in inv_idx.items():
-            for i in idxs:
-                arr[i] = word
-        return " ".join(arr)
-    except Exception:
-        return ""
-
-# ================================================================
-#                      FETCHING FROM OPENALEX
-# ================================================================
-
-def fetch_openalex_authors(name):
-    """Search OpenAlex for author name"""
-    url = f"https://api.openalex.org/authors?search={name}"
-    data = safe_request(url)
-    if not data or "results" not in data:
-        return []
-    return data["results"]
-
-def fetch_openalex_papers(openalex_id, author_name):
-    """Fetch author papers (sorted by citations desc)"""
-    url = (
-        f"https://api.openalex.org/works?"
-        f"filter=authorships.author.id:https://openalex.org/{openalex_id},publication_year:>2015"
-        f"&sort=cited_by_count:desc&per-page=100"
-    )
-    data = safe_request(url)
-    if not data or "results" not in data:
-        return []
-
-    papers = []
-    for w in data["results"]:
-        abstract = decode_openalex_abstract(w.get("abstract_inverted_index"))
-
-        # ✅ Safe extraction for venue
-        pl = w.get("primary_location") or {}
-        source = pl.get("source") if isinstance(pl, dict) else None
-        venue = source.get("display_name", "Unknown") if isinstance(source, dict) else "Unknown"
-
-        coauthors = []
-        for auth in w.get("authorships", []):
-            a = auth.get("author", {})
-            author_display_name = a.get("display_name", "")
-            
-            # ✅ Filter out the main author themselves
-            if author_display_name.lower() == author_name.lower():
-                continue
-                
-            insts = auth.get("institutions")
-            aff = insts[0].get("display_name", "") if insts and len(insts) > 0 else ""
-            coauthors.append({
-                "name": author_display_name,
-                "authorId": a.get("id", ""),
-                "affiliation": aff
-            })
-
-        papers.append({
-            "title": w.get("title", ""),
-            "venue": venue,
-            "year": w.get("publication_year", "Unknown"),
-            "abstract": abstract,
-            "citations": w.get("cited_by_count", 0),
-            "doi": w.get("doi", ""),
-            "coauthors": coauthors,
-            "source": "OpenAlex"
-        })
-    return papers
-
-# ================================================================
-#                   FETCHING FROM SEMANTIC SCHOLAR
-# ================================================================
-
-def fetch_semantic_scholar_author(name):
-    """Search author in Semantic Scholar"""
-    url = f"https://api.semanticscholar.org/graph/v1/author/search?query={name}&fields=name,affiliations,paperCount,url,papers&limit=5"
-    data = safe_request(url)
-    if not data or "data" not in data:
-        return []
-    return data["data"]
-
-def fetch_semantic_scholar_papers(author_id, author_name):
-    """Fetch papers from Semantic Scholar (for missing abstracts)"""
-    url = f"https://api.semanticscholar.org/graph/v1/author/{author_id}/papers?fields=title,abstract,year,venue,citationCount,authors"
-    data = safe_request(url)
-    if not data or "data" not in data:
-        return []
-
-    papers = []
-    for p in data["data"]:
-        authors = p.get("authors", [])
-        coauthors = []
-        for a in authors:
-            author_display_name = a.get("name", "")
-            # ✅ Filter out the main author themselves
-            if author_display_name.lower() == author_name.lower():
-                continue
-            coauthors.append({
-                "name": author_display_name,
-                "authorId": a.get("authorId", "")
-            })
-
-        papers.append({
-            "title": p.get("title", ""),
-            "venue": p.get("venue", "Unknown"),
-            "year": p.get("year", "Unknown"),
-            "abstract": p.get("abstract", ""),
-            "citations": p.get("citationCount", 0),
-            "doi": "",
-            "coauthors": coauthors,
-            "source": "SemanticScholar"
-        })
-    return papers
-
-# ================================================================
-#             RESEARCH SUMMARY GENERATION
-# ================================================================
-
-def extract_technical_terms(text):
-    """Extract multi-word technical terms"""
+def display_author_candidates(authors: List[dict]) -> dict:
+    """Display author candidates and let user select one."""
+    print("\n" + "=" * 80)
+    print("🔍 FOUND MULTIPLE AUTHORS - Please select one:")
+    print("=" * 80)
     
-    patterns = [
-        r'\b(?:Cloud|Edge|Fog|IoT|Distributed|Stream|Real-time|Big Data)\s+(?:Computing|Processing|Systems|Networks|Analytics)\b',
-        r'\b(?:Machine|Deep|Neural)\s+(?:Learning|Networks)\b',
-        r'\b(?:Virtual|Smart|Cyber)\s+(?:Machine|City|Physical)\b',
-        r'\bComplex\s+Event\s+Processing\b',
-        r'\bGraph\s+Processing\b',
-        r'\bFederated\s+Learning\b',
-        r'\bResource\s+Scheduling\b',
-        r'\bData\s+Analytics\b',
-    ]
-    
-    terms = []
-    for pattern in patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        terms.extend([m.strip() for m in matches])
-    
-    return terms
-
-def extract_research_themes(papers):
-    """Extract main research themes from titles and abstracts"""
-    all_text = " ".join([
-        f"{p['title']} {p.get('abstract', '')}" 
-        for p in papers if p.get('abstract')
-    ])
-    
-    # Extract technical terms
-    tech_terms = extract_technical_terms(all_text)
-    
-    # Count and normalize
-    term_counts = Counter([t.lower() for t in tech_terms])
-    
-    # Get most common themes
-    common_themes = [term.title() for term, _ in term_counts.most_common(10)]
-    
-    return common_themes
-
-def generate_research_summary(papers, author_name):
-    """Generate comprehensive rule-based research summary"""
-    if not papers:
-        return "No papers available to generate summary."
-    
-    # Filter papers with good abstracts
-    good_papers = [p for p in papers if p.get('abstract') and len(p['abstract']) > 100]
-    
-    if len(good_papers) < 3:
-        return f"{author_name}'s research focuses on distributed computing systems and cloud technologies."
-    
-    # Extract themes
-    themes = extract_research_themes(good_papers)
-    
-    # Get statistics
-    total_citations = sum(p['citations'] for p in papers)
-    avg_citations = total_citations // len(papers) if papers else 0
-    
-    # Get top venues
-    venue_counts = Counter([p['venue'] for p in papers if p['venue'] != 'Unknown'])
-    top_venues = [v for v, _ in venue_counts.most_common(3)]
-    
-    # Get recent year range
-    years = [p['year'] for p in papers if isinstance(p['year'], int)]
-    year_range = f"{min(years)}-{max(years)}" if years else "recent years"
-    
-    # Identify specific contributions from top papers
-    top_3 = sorted(good_papers, key=lambda x: x['citations'], reverse=True)[:3]
-    contributions = []
-    
-    for paper in top_3:
-        abstract = paper['abstract'].lower()
-        title = paper['title'].lower()
+    for i, author in enumerate(authors, 1):
+        display_name = author.get("display_name", "Unknown")
         
-        # Extract key contributions
-        if 'propose' in abstract or 'present' in abstract:
-            # Find what's being proposed
-            if 'benchmark' in title or 'benchmark' in abstract:
-                contributions.append("benchmark frameworks for performance evaluation")
-            elif 'scheduling' in title or 'scheduling' in abstract:
-                contributions.append("novel scheduling algorithms")
-            elif 'architecture' in title or 'architecture' in abstract:
-                contributions.append("system architectures")
-            elif 'platform' in title or 'platform' in abstract:
-                contributions.append("computing platforms")
+        # Get affiliation
+        affiliation = "N/A"
+        last_institution = author.get("last_known_institution", {})
+        if last_institution:
+            affiliation = last_institution.get("display_name", "N/A")
+        
+        # If still N/A, try last_known_institutions array
+        if affiliation == "N/A":
+            institutions = author.get("last_known_institutions", [])
+            if institutions:
+                affiliation = institutions[0].get("display_name", "N/A")
+        
+        works_count = author.get("works_count", 0)
+        cited_by_count = author.get("cited_by_count", 0)
+        h_index = author.get("summary_stats", {}).get("h_index", 0)
+        
+        print(f"\n{i}. {display_name}")
+        print(f"   📍 Affiliation: {affiliation}")
+        print(f"   📊 Papers: {works_count} | 📈 Citations: {cited_by_count} | 🎯 h-index: {h_index}")
     
-    # Remove duplicates
-    contributions = list(set(contributions))
+    print("\n" + "=" * 80)
     
-    # Build summary
-    summary_parts = []
+    # Get user selection
+    while True:
+        try:
+            choice = input(f"\nSelect author (1-{len(authors)}) or 'q' to quit: ").strip()
+            if choice.lower() == 'q':
+                return None
+            
+            choice_num = int(choice)
+            if 1 <= choice_num <= len(authors):
+                return authors[choice_num - 1]
+            else:
+                print(f"❌ Please enter a number between 1 and {len(authors)}")
+        except ValueError:
+            print("❌ Invalid input. Please enter a number or 'q' to quit")
+
+def fetch_openalex_papers(author_id: str, max_papers: int = 20):
+    """Fetch papers for a specific author ID."""
+    url = f"https://api.openalex.org/works?filter=authorships.author.id:{author_id}&sort=cited_by_count:desc&per-page={max_papers}"
+    r = requests.get(url)
+    r.raise_for_status()
+    papers_data = r.json().get("results", [])
     
-    # Opening statement
-    primary_areas = ", ".join(themes[:3]) if len(themes) >= 3 else ", ".join(themes)
-    summary_parts.append(
-        f"{author_name}'s research primarily focuses on {primary_areas}."
-    )
+    papers = []
+    for item in papers_data:
+        # Decode inverted abstract index if present
+        abstract = ""
+        inv_abstract = item.get("abstract_inverted_index")
+        if inv_abstract:
+            try:
+                max_pos = max([max(positions) for positions in inv_abstract.values()])
+                words = [""] * (max_pos + 1)
+                for word, positions in inv_abstract.items():
+                    for pos in positions:
+                        words[pos] = word
+                abstract = " ".join(words)
+            except:
+                abstract = ""
+        
+        # Get venue information
+        primary_location = item.get("primary_location", {})
+        venue = ""
+        if primary_location:
+            source = primary_location.get("source", {})
+            if source:
+                venue = source.get("display_name", "")
+        
+        # Fallback to host_venue if primary_location doesn't have venue
+        if not venue:
+            venue = item.get("host_venue", {}).get("display_name", "")
+        
+        # Get title, handle None case
+        title = item.get("display_name") or item.get("title", "Untitled")
+        
+        papers.append({
+            "title": title,
+            "year": item.get("publication_year", "N/A"),
+            "venue": venue if venue else "N/A",
+            "cited_by_count": item.get("cited_by_count", 0),
+            "abstract": abstract,
+            "openalex_id": item.get("id", "")
+        })
     
-    # Research impact
-    if total_citations > 500:
-        summary_parts.append(
-            f"Their work has garnered significant attention with {total_citations} citations, "
-            f"demonstrating substantial impact in the field."
-        )
+    return papers
+
+# -----------------------------
+# Semantic Scholar Abstract Fetching
+# -----------------------------
+async def fetch_semantic_abstract(session, title: str) -> str:
+    """Fetch abstract from Semantic Scholar."""
+    try:
+        search_url = "https://api.semanticscholar.org/graph/v1/paper/search"
+        params = {"query": title, "limit": 1, "fields": "title,abstract"}
+        async with session.get(search_url, params=params) as resp:
+            if resp.status != 200:
+                return ""
+            data = await resp.json()
+            papers = data.get("data", [])
+            if papers and papers[0].get("abstract"):
+                return papers[0]["abstract"]
+    except Exception:
+        pass
+    return ""
+
+async def enrich_papers_with_abstracts(papers: List[dict]) -> List[dict]:
+    """Enrich papers with Semantic Scholar abstracts in parallel."""
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_semantic_abstract(session, p["title"]) for p in papers]
+        results = await asyncio.gather(*tasks)
+        
+        for paper, ss_abstract in zip(papers, results):
+            if ss_abstract:
+                # Combine OpenAlex + Semantic Scholar abstracts
+                if paper["abstract"]:
+                    paper["combined_abstract"] = paper["abstract"] + " " + ss_abstract
+                else:
+                    paper["combined_abstract"] = ss_abstract
+            else:
+                paper["combined_abstract"] = paper["abstract"]
+    
+    return papers
+
+# -----------------------------
+# Rule-based summary fallback
+# -----------------------------
+def rule_based_summary(author_name: str, papers: List[dict]) -> str:
+    """Generate rule-based summary from paper abstracts."""
+    all_text = " ".join([p.get("combined_abstract", "") for p in papers])
+    words = re.findall(r"\b[a-zA-Z]{5,}\b", all_text.lower())
+    counter = Counter(words)
+    
+    # Filter out common words
+    stopwords = {"based", "using", "paper", "approach", "method", "system", "systems", 
+                 "research", "study", "results", "proposed", "present", "provide"}
+    keywords = [w for w, _ in counter.most_common(20) if w not in stopwords][:10]
+    
+    summary = f"{author_name} has published {len(papers)} highly-cited papers. "
+    summary += f"Main research areas include: {', '.join(keywords)}. "
+    
+    total_citations = sum(p.get("cited_by_count", 0) for p in papers)
+    summary += f"These papers have received {total_citations} citations in total."
+    
+    return summary
+
+# -----------------------------
+# LLM Summary Generation
+# -----------------------------
+def generate_author_summary(author_name: str, author_info: dict, papers: List[dict]) -> str:
+    """Generate author summary using LLM with fallback."""
+    # Prepare context with paper titles and abstracts
+    papers_text = []
+    for i, p in enumerate(papers[:15], 1):  # Limit to top 15 to avoid token limits
+        abstract = p.get("combined_abstract", "")[:500]  # Truncate long abstracts
+        papers_text.append(f"{i}. {p['title']} ({p.get('year', 'N/A')})\n   Abstract: {abstract}")
+    
+    combined_text = "\n\n".join(papers_text)
+    
+    # Build comprehensive prompt
+    affiliation = author_info.get("last_known_institution", {})
+    if affiliation:
+        affiliation_name = affiliation.get("display_name", "Unknown")
     else:
-        summary_parts.append(
-            f"Their research has received {total_citations} citations across {len(papers)} publications."
-        )
+        affiliation_name = "Unknown"
     
-    # Key contributions
-    if contributions:
-        contrib_str = ", ".join(contributions[:3])
-        summary_parts.append(
-            f"Key contributions include {contrib_str}."
-        )
+    # Also try to get affiliation from last_known_institutions array
+    if affiliation_name == "Unknown":
+        institutions = author_info.get("last_known_institutions", [])
+        if institutions:
+            affiliation_name = institutions[0].get("display_name", "Unknown")
     
-    # Research themes in detail
-    if len(themes) > 3:
-        additional_themes = ", ".join(themes[3:6])
-        summary_parts.append(
-            f"Their research also explores {additional_themes}."
-        )
+    total_works = author_info.get("works_count", 0)
+    total_citations = author_info.get("cited_by_count", 0)
+    h_index = author_info.get("summary_stats", {}).get("h_index", 0)
     
-    # Publication venues
-    if top_venues:
-        venue_str = ", ".join(top_venues[:2])
-        summary_parts.append(
-            f"Their work appears in prestigious venues including {venue_str}."
-        )
-    
-    return " ".join(summary_parts)
+    prompt = f"""You are analyzing the research profile of {author_name}, a researcher affiliated with {affiliation_name}.
 
-# ================================================================
-#                          MAIN LOGIC
-# ================================================================
+Author Metrics:
+- Total Publications: {total_works}
+- Total Citations: {total_citations}
+- h-index: {h_index}
 
+Based on the following top papers and their abstracts, write a comprehensive research summary (2-3 paragraphs) covering:
+1. Main research areas and themes
+2. Key methodologies and approaches
+3. Notable contributions and impact
+
+Top Papers:
+{combined_text}
+
+Write a detailed, coherent summary of {author_name}'s research profile:"""
+
+    try:
+        response = ollama.generate(model=LLM_MODEL, prompt=prompt)
+        summary = response.get("response", "")
+        
+        if not summary.strip():
+            raise ValueError("Empty summary from LLM")
+        
+        return summary.strip()
+    
+    except Exception as e:
+        print(f"⚠️  LLM failed: {e}")
+        print("📝 Using rule-based summary instead...\n")
+        return rule_based_summary(author_name, papers)
+
+# -----------------------------
+# Main Function
+# -----------------------------
 def main():
-    print("🔄 Initializing Author Profile System...\n")
-
+    print("🔍 Enhanced Author Profile System\n")
     author_name = input("Enter author name: ").strip()
-
-    # --- Fetch OpenAlex authors ---
-    print("📡 Searching OpenAlex database...")
-    openalex_authors = fetch_openalex_authors(author_name)
-    if not openalex_authors:
-        print("❌ No author found on OpenAlex.")
+    
+    # Step 1: Fetch author candidates
+    print(f"\n📋 Searching for: {author_name}")
+    authors = fetch_author_candidates(author_name)
+    
+    if not authors:
+        print("❌ No authors found in OpenAlex")
         return
-
-    # --- Auto-select author with most papers ---
-    oa_author = max(openalex_authors, key=lambda a: a.get("works_count", 0))
-    print(f"📋 Selected author: {oa_author.get('display_name')} ({oa_author.get('works_count')} papers)")
-
-    # --- Fetch papers ---
-    print("📚 Fetching publications from OpenAlex...")
-    oa_papers = fetch_openalex_papers(oa_author["id"].split("/")[-1], oa_author.get('display_name'))
-
-    # --- If abstracts missing, fill from Semantic Scholar ---
-    print("📚 Fetching additional data from Semantic Scholar...")
-    ss_papers = []
-    ss_authors = fetch_semantic_scholar_author(author_name)
-    if ss_authors:
-        ss_best = max(ss_authors, key=lambda a: a.get("paperCount", 0))
-        ss_papers = fetch_semantic_scholar_papers(ss_best["authorId"], oa_author.get('display_name'))
-
-    # Merge and deduplicate by title
-    combined = {p["title"].strip().lower(): p for p in (oa_papers + ss_papers) if p["title"]}
-    all_papers = list(combined.values())
-
-    # --- Summary generation ---
-    papers_with_abstracts = [p for p in all_papers if p.get('abstract') and len(p['abstract']) > 50]
-    print(f"📊 Total papers merged: {len(all_papers)} | With abstracts: {len(papers_with_abstracts)}\n")
     
-    print("🤖 Generating research summary...")
-    summary = generate_research_summary(all_papers, oa_author.get('display_name'))
-    print("✅ Summary generated successfully\n")
-
-    # --- Display output ---
+    # Step 2: Let user select the correct author
+    if len(authors) == 1:
+        print(f"✅ Found: {authors[0].get('display_name', author_name)}")
+        author_info = authors[0]
+    else:
+        author_info = display_author_candidates(authors)
+        if not author_info:
+            print("\n👋 Exiting...")
+            return
+        print(f"\n✅ Selected: {author_info.get('display_name', author_name)}")
+    
+    author_id = author_info["id"]
+    display_name = author_info.get("display_name", author_name)
+    
+    # Step 3: Fetch papers
+    print(f"\n📚 Fetching top papers from OpenAlex...")
+    papers = fetch_openalex_papers(author_id)
+    
+    if not papers:
+        print("❌ No papers found for this author")
+        return
+    
+    # Step 4: Enrich with Semantic Scholar abstracts
+    print("🔄 Enriching with Semantic Scholar abstracts...")
+    papers = asyncio.run(enrich_papers_with_abstracts(papers))
+    
+    # Step 5: Generate LLM summary
+    print(f"🤖 Generating research summary using {LLM_MODEL}...\n")
+    summary = generate_author_summary(display_name, author_info, papers)
+    
+    # -----------------------------
+    # Display Results
+    # -----------------------------
     print("=" * 80)
-    print(f"AUTHOR PROFILE: {oa_author.get('display_name')}")
+    print(f"AUTHOR PROFILE: {display_name}")
     print("=" * 80)
     
-    # ✅ Extract affiliation with better debugging
-    affiliation = "Unknown"
-    last_known_inst = oa_author.get('last_known_institutions')
+    # Get affiliation with better handling
+    affiliation = author_info.get("last_known_institution", {})
+    if affiliation:
+        affiliation_name = affiliation.get("display_name", "N/A")
+    else:
+        affiliation_name = "N/A"
     
-    # OpenAlex sometimes returns last_known_institutions (plural) as array
-    if last_known_inst and isinstance(last_known_inst, list) and len(last_known_inst) > 0:
-        affiliation = last_known_inst[0].get('display_name', 'Unknown')
-    # Or last_known_institution (singular) as dict
-    elif oa_author.get('last_known_institution'):
-        inst = oa_author.get('last_known_institution')
-        if isinstance(inst, dict):
-            affiliation = inst.get('display_name', 'Unknown')
+    # Try alternate affiliation field
+    if affiliation_name == "N/A":
+        institutions = author_info.get("last_known_institutions", [])
+        if institutions:
+            affiliation_name = institutions[0].get("display_name", "N/A")
     
-    print(f"Affiliation: {affiliation}")
-    print(f"Total Publications: {oa_author.get('works_count', 'N/A')}")
-    print(f"Citation Count: {oa_author.get('cited_by_count', 'N/A')}")
-    print(f"h-index: {oa_author.get('summary_stats', {}).get('h_index', 'N/A')}\n")
-
-    print("🧠 RESEARCH SUMMARY:")
+    # Get affiliation from affiliations array if still not found
+    if affiliation_name == "N/A":
+        affiliations = author_info.get("affiliations", [])
+        if affiliations:
+            affiliation_name = affiliations[0].get("institution", {}).get("display_name", "N/A")
+    
+    print(f"📍 Affiliation: {affiliation_name}")
+    print(f"📊 Total Publications: {author_info.get('works_count', 0)}")
+    print(f"📈 Total Citations: {author_info.get('cited_by_count', 0)}")
+    print(f"🎯 h-index: {author_info.get('summary_stats', {}).get('h_index', 0)}")
+    
+    print("\n" + "=" * 80)
+    print("🧠 RESEARCH SUMMARY")
+    print("=" * 80)
     print(summary)
+    
+    print("\n" + "=" * 80)
+    print("📚 TOP PAPERS")
+    print("=" * 80)
+    
+    # Ask if user wants to see abstracts
+    show_abstracts = input("\n📄 Show paper abstracts? (y/N): ").strip().lower() == 'y'
     print()
-
-    # Extract and display research themes
-    themes = extract_research_themes(papers_with_abstracts)
-    if themes:
-        print("🔑 KEY RESEARCH AREAS:")
-        for i, theme in enumerate(themes[:8], 1):
-            print(f"   {i}. {theme}")
-        print()
-
-    # Ask once whether to show abstracts
-    show_abstracts = input("Show full abstracts? (y/N): ").strip().lower() == "y"
-
-    print("\n📚 Top 20 Papers:\n")
-    all_papers.sort(key=lambda p: p["citations"], reverse=True)
-    for i, p in enumerate(all_papers[:20], 1):
-        print("=" * 80)
-        print(f"{i}. [{p['year']}] {p['title']}")
-        print(f"   📊 Venue: {p['venue']} | Citations: {p['citations']} | Source: {p['source']}")
-        if p["coauthors"]:
-            print(f"   👥 Co-authors ({len(p['coauthors'])}):")
-            for ca in p["coauthors"][:25]:
-                aff = ca.get('affiliation', '')
-                aid = ca.get('authorId', '')
-                print(f"      • {ca['name']} | {aff} | ID:{aid}")
-        if show_abstracts and p.get("abstract"):
-            print(f"   📄 Abstract: {p['abstract']}\n")
-
-# ================================================================
-#                           ENTRY POINT
-# ================================================================
+    
+    for i, p in enumerate(papers, start=1):
+        print(f"\n{i}. {p['title']}")
+        print(f"   📅 Year: {p.get('year', 'N/A')} | 📊 Citations: {p.get('cited_by_count', 0)}")
+        print(f"   🏛️  Venue: {p.get('venue', 'N/A')}")
+        
+        if show_abstracts:
+            abstract = p.get('combined_abstract', '') or p.get('abstract', '')
+            if abstract:
+                # Truncate very long abstracts for readability
+                if len(abstract) > 500:
+                    abstract = abstract[:500] + "..."
+                print(f"   📝 Abstract: {abstract}")
+            else:
+                print(f"   📝 Abstract: Not available")
 
 if __name__ == "__main__":
     main()
