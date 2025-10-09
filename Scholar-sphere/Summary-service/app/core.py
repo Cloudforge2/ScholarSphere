@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Enhanced Author Profile System with Rule-Based Summary & Co-authors
-Author: Bhavya + Claude (Fully Optimized)
+Author Profile System with Summary & Co-authors
 """
 
 import requests
@@ -146,12 +145,12 @@ def fetch_semantic_scholar_papers(author_id, author_name):
     return papers
 
 # ================================================================
-#            RULE-BASED RESEARCH SUMMARY GENERATION
+#             RESEARCH SUMMARY GENERATION
 # ================================================================
 
 def extract_technical_terms(text):
     """Extract multi-word technical terms"""
-    # Common CS/Engineering patterns - more specific
+    
     patterns = [
         r'\b(?:Cloud|Edge|Fog|IoT|Distributed|Stream|Real-time|Big Data)\s+(?:Computing|Processing|Systems|Networks|Analytics)\b',
         r'\b(?:Machine|Deep|Neural)\s+(?:Learning|Networks)\b',
