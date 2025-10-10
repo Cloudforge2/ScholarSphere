@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>WhatsApp Home</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e5ddd5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .chat-container {
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            height: 90vh;
+            background-color: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        /* Sidebar */
+        .chat-sidebar {
+            width: 350px;
+            background-color: #f0f2f5;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-sidebar h5 {
+            background-color: #075E54;
+            color: #fff;
+            margin: 0;
+            padding: 15px;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        .user-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+        .user-list li {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .user-list li:hover { background-color: #ece5dd; }
+        .user-list li.active { background-color: #dcdcdc; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #bbb; margin-right: 15px; }
+        .user-info { display: flex; flex-direction: column; }
+        .user-name { font-weight: bold; }
+        .user-last-msg { font-size: 0.85rem; color: #555; }
+        .logout-btn { padding: 10px; text-align: center; border-top: 1px solid #ddd; background-color: #f0f2f5; }
+        .logout-btn a { text-decoration: none; color: #ff3b30; font-weight: bold; }
+
+        /* Chat panel */
+        .chat-panel { flex: 1; display: flex; flex-direction: column; }
+        .chat-header { background-color: #075E54; color: white; padding: 15px 20px; font-size: 1.3rem; font-weight: bold; }
+        .chat-box {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #ece5dd;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Message bubble */
+        .message-group { display: flex; flex-direction: column; margin-bottom: 8px; }
+        .message {
+            display: inline-block;
+            padding: 10px 14px;
+            max-width: 70%;
+            word-wrap: break-word;
+            position: relative;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        }
+
+        .message.self {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+            border-radius: 18px 18px 0 18px;
+            margin-bottom: 5px;
+        }
+
+        .message.other {
+            background-color: #fff;
+            align-self: flex-start;
+            border-radius: 18px 18px 18px 0;
+            margin-bottom: 5px;
+        }
+
+        .timestamp {
+            font-size: 0.65rem;
+            color: #888;
+            margin-top: 2px;
+            text-align: right;
+        }
+
+        /* Input */
+        .chat-input { display: flex; padding: 10px; border-top: 1px solid #ddd; background-color: #f0f2f5; }
+        .chat-input input[type="text"] { flex: 1; padding: 10px 15px; border-radius: 25px; border: 1px solid #ccc; }
+        .chat-input button { margin-left: 10px; background-color: #25D366; border: none; color: white; padding: 10px 15px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; }
+        .chat-input button:hover { background-color: #1ebe5d; }
+    </style>
+</head>
+<body th:data-username="${currentUser}">
+
+<div class="chat-container">
+    <div class="chat-sidebar">
+        <h5>Chats</h5>
+        <ul class="user-list" id="user-list"></ul>
+        <div class="logout-btn"><a th:href="@{/logout}">Logout</a></div>
+    </div>
+
+    <div class="chat-panel">
+        <div class="chat-header" id="chat-header">Select a user</div>
+        <div class="chat-box" id="chat-box">
+            <p style="text-align:center; color:#888;">Select a user to start chatting</p>
+        </div>
+        <form id="chat-form" class="chat-input">
+            <input type="text" id="message-input" name="content" placeholder="Type a message..." required/>
+            <input type="hidden" id="receiver" name="receiver"/>
+            <button type="submit">&#9658;</button>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const userListContainer = document.getElementById("user-list");
+    const chatBox = document.getElementById("chat-box");
+    const chatHeader = document.getElementById("chat-header");
+    const chatForm = document.getElementById("chat-form");
+    const receiverInput = document.getElementById("receiver");
+    const messageInput = document.getElementById("message-input");
+
+    const currentUser = document.body.dataset.username;
+    let selectedUser = null;
+    let stompClient = null;
+
+    function formatTime(date) {
+        const h = date.getHours();
+        const m = date.getMinutes();
+        return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+    }
+
+    function displayMessage(msg) {
+        if (!selectedUser) return;
+        // show only messages between current user and selected user
+        if ((msg.sender.username !== selectedUser && msg.receiver.username !== selectedUser) &&
+            (msg.sender.username !== currentUser && msg.receiver.username !== currentUser)) return;
+
+        const groupDiv = document.createElement("div");
+        groupDiv.className = "message-group";
+
+        const msgDiv = document.createElement("div");
+        msgDiv.className = msg.sender.username === currentUser ? "message self" : "message other";
+        msgDiv.innerText = msg.content;
+
+        const ts = document.createElement("div");
+        ts.className = "timestamp";
+        ts.innerText = formatTime(new Date(msg.timestamp || Date.now()));
+
+        groupDiv.appendChild(msgDiv);
+        groupDiv.appendChild(ts);
+        chatBox.appendChild(groupDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function loadConversation(username) {
+        fetch(`/chat/conversation?receiver=${username}`)
+            .then(res => res.json())
+            .then(messages => {
+                chatBox.innerHTML = "";
+                messages.forEach(displayMessage);
+            });
+    }
+
+    function renderUserList(users) {
+        userListContainer.innerHTML = "";
+        const otherUsers = users.filter(u => u.username !== currentUser);
+
+        otherUsers.forEach(user => {
+            const li = document.createElement("li");
+            li.classList.add("user-item");
+            li.setAttribute("data-username", user.username);
+            li.innerHTML = `
+                <div class="user-avatar"></div>
+                <div class="user-info">
+                    <span class="user-name">${user.username}</span>
+                    <span class="user-last-msg">Last message...</span>
+                </div>
+            `;
+            userListContainer.appendChild(li);
+        });
+
+        if (!selectedUser && otherUsers.length > 0) {
+            const firstUser = userListContainer.querySelector("li.user-item");
+            firstUser.classList.add("active");
+            selectedUser = firstUser.dataset.username;
+            receiverInput.value = selectedUser;
+            chatHeader.textContent = selectedUser;
+            loadConversation(selectedUser);
+        }
+    }
+
+    userListContainer.addEventListener("click", function(e) {
+        const li = e.target.closest("li.user-item");
+        if (!li) return;
+        [...document.querySelectorAll("#user-list li")].forEach(el => el.classList.remove("active"));
+        li.classList.add("active");
+
+        selectedUser = li.dataset.username;
+        receiverInput.value = selectedUser;
+        chatHeader.textContent = selectedUser;
+        loadConversation(selectedUser);
+    });
+
+    function connect() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function(frame) {
+            console.log('STOMP connected:', frame);
+
+            stompClient.subscribe('/user/queue/messages', function(msgOutput) {
+                const msg = JSON.parse(msgOutput.body);
+                displayMessage(msg);
+            });
+
+            stompClient.subscribe('/topic/users', function(userOutput) {
+                const users = JSON.parse(userOutput.body);
+                renderUserList(users);
+            });
+
+            stompClient.subscribe('/user/queue/users', function(message) {
+                const users = JSON.parse(message.body);
+                renderUserList(users);
+            });
+
+            stompClient.send("/app/login", {}, JSON.stringify({ username: currentUser }));
+        });
+    }
+
+    connect();
+
+    chatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!selectedUser || !stompClient) return;
+        const content = messageInput.value.trim();
+        if (!content) return;
+
+        const message = { receiver: { username: selectedUser }, content: content };
+        stompClient.send("/app/chat.send", {}, JSON.stringify(message));
+        messageInput.value = "";
+    });
+});
+</script>
+
+</body>
+</html>
