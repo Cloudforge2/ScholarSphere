@@ -9,8 +9,6 @@ app = FastAPI(
     description="Provides advanced, multi-source, LLM-generated summaries for academic authors and papers."
 )
 
-# This matches: /professors/summary/**
-# Renamed endpoint for clarity, but path is what matters for the gateway.
 @app.get("/professors/summary/by-name", tags=["Professors"])
 async def get_professor_summary_by_name(name: str = Query(..., description="Full name of the author")):
     """
@@ -25,8 +23,8 @@ async def get_professor_summary_by_name(name: str = Query(..., description="Full
             author_info = authors[0]
             author_id = author_info["id"]
 
-            # Fetch top 10 papers to get a good sample for analysis
-            raw_papers = await core.fetch_openalex_papers_by_author_id(session, author_id, max_papers=10)
+            # Fetch a larger pool of papers (e.g., 30) for better analysis
+            raw_papers = await core.fetch_openalex_papers_by_author_id(session, author_id, max_papers=30)
             if not raw_papers:
                 return {"author_info": author_info, "summary": "Author found, but no papers were available for analysis."}
             
@@ -34,18 +32,19 @@ async def get_professor_summary_by_name(name: str = Query(..., description="Full
             enrichment_tasks = [core.enrich_paper_with_full_text(session, core.process_paper_data(p)) for p in raw_papers]
             enriched_papers = await asyncio.gather(*enrichment_tasks)
 
-            # Generate the final summary using the fully enriched data
+            # Generate the final summary using the fully enriched data and advanced logic
             summary = await core.generate_author_summary(session, author_info, enriched_papers)
             
             return {
-               
+                # "author_info": author_info,
                 "research_summary": summary,
-                "papers_analyzed": [{
+                "papers_analyzed_count": len(enriched_papers),
+                "papers_sample": [{
                     "title": p.get('title'),
                     "year": p.get('publication_year'),
                     "citations": p.get('cited_by_count'),
                     "sources": p.get('content_sources')
-                } for p in enriched_papers]
+                } for p in enriched_papers[:10]] # Show a sample of papers processed
             }
         except aiohttp.ClientResponseError as e:
             raise HTTPException(status_code=e.status, detail=f"External API error: {e.message}")
@@ -53,7 +52,6 @@ async def get_professor_summary_by_name(name: str = Query(..., description="Full
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
-# This matches: /paper/by-id/**
 @app.get("/paper/by-id", tags=["Papers"])
 async def get_paper_summary_by_id(paper_id: str = Query(..., description="OpenAlex ID or full OpenAlex URL of the paper")):
     """
@@ -67,10 +65,12 @@ async def get_paper_summary_by_id(paper_id: str = Query(..., description="OpenAl
             if not raw_paper:
                 raise HTTPException(status_code=404, detail=f"Paper with ID '{search_id}' not found.")
 
-            # Run the full enrichment and summary pipeline
             paper_info = core.process_paper_data(raw_paper)
             enriched_paper = await core.enrich_paper_with_full_text(session, paper_info)
             summary = await core.generate_paper_summary(session, enriched_paper)
+            
+            # Remove full content from final response to keep it clean
+            enriched_paper.pop("full_content", None)
             
             return {"paper_info": enriched_paper, "summary": summary}
         
@@ -79,7 +79,6 @@ async def get_paper_summary_by_id(paper_id: str = Query(..., description="OpenAl
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
-# This matches: /paper/by-title/**
 @app.get("/paper/by-title", tags=["Papers"])
 async def get_paper_summary_by_title(title: str = Query(..., description="Title of the paper to search for.")):
     """
@@ -89,7 +88,6 @@ async def get_paper_summary_by_title(title: str = Query(..., description="Title 
 
     async with aiohttp.ClientSession() as session:
         try:
-            # Re-using the author paper search as it's more general for titles
             params = {"filter": f"title.search:{decoded_title}", "per-page": 1, "mailto": core.MAILTO_EMAIL}
             data = await core._fetch_json(session, "https://api.openalex.org/works", params)
             
@@ -98,11 +96,13 @@ async def get_paper_summary_by_title(title: str = Query(..., description="Title 
 
             raw_paper = data["results"][0]
             
-            # Run the full enrichment and summary pipeline
             paper_info = core.process_paper_data(raw_paper)
             enriched_paper = await core.enrich_paper_with_full_text(session, paper_info)
             summary = await core.generate_paper_summary(session, enriched_paper)
             
+            # Remove full content from final response
+            enriched_paper.pop("full_content", None)
+
             return {"paper_info": enriched_paper, "summary": summary}
 
         except aiohttp.ClientResponseError as e:
