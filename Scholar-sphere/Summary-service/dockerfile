@@ -1,9 +1,17 @@
 FROM python:3.10-slim
 
 WORKDIR /app
-COPY . /app
 
+# Copy requirements first for better caching
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# --- CHANGE THIS PART ---
+# Copy the content of your local 'app' directory into the container's WORKDIR '/app'
+COPY ./app .
+
 EXPOSE 8085
-CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8085"]
+
+# --- AND CHANGE THIS PART ---
+# Now that api.py is directly in /app, the command is simpler
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8085"]

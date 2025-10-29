@@ -1,14 +1,12 @@
-requests>=2.28.2
-aiohttp>=3.8.4
-PyPDF2>=3.0.0
-pdfplumber>=0.7.6
-# Optional (useful for faster XML/HTML handling or improved PDF extraction)
-# lxml>=4.9.2
-# pdfminer.six>=20221105
+# Core libraries for making HTTP requests
+requests
+aiohttp
 
-# Note: The script uses only standard-library modules for most tasks.
-# The packages above are required for HTTP requests, async fetching, and
-# PDF extraction. Install with:
-#    pip install -r requirements.txt
-Allow
-Skip
+# Web framework for the API endpoint
+fastapi
+uvicorn[standard]
+
+# Optional, but highly recommended for PDF text extraction
+# The script has fallback logic, but these are needed for full functionality.
+PyPDF2
+pdfplumber
