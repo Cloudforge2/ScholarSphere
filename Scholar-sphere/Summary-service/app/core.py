@@ -7,7 +7,7 @@ Features:
 - Removes duplicate content from multiple sources
 - Downloads and parses PDFs from multiple sources
 - Shows co-authors and their affiliations
-- Generates detailed summaries using advanced LLM (LLama 3.3:70B Model)
+- Generates detailed summaries using advanced LLM
 """
 
 import requests
@@ -37,6 +37,106 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "llama3.3:70b")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", None)
 
+
+# -----------------------------
+# Helpers: sanitize text and manage GROQ API key
+# -----------------------------
+def sanitize_text(text: Optional[str]) -> str:
+    """Clean extracted/abstract text before summarization/display.
+
+    - Remove simple XML/HTML/JATS tags (e.g. <jats:p>),
+    - Remove common copyright/footer lines,
+    - Collapse whitespace and strip.
+    """
+    if not text:
+        return ""
+
+    # Convert to str (defensive)
+    text = str(text)
+
+    # Remove XML/HTML tags like <jats:p> and any angle-bracketed tags
+    text = re.sub(r"<[^>]+>", " ", text)
+
+    # Remove common copyright/footer lines
+    text = re.sub(r"(?im)^.*copyright.*$", " ", text)
+    text = re.sub(r"(?im)^.*all rights reserved.*$", " ", text)
+
+    # Replace multiple whitespace/newlines with single space
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def trim_to_last_sentence(text: str) -> str:
+    """Trim off a trailing incomplete fragment so output ends at last sentence.
+
+    If no sentence-ending punctuation is found, return the original text.
+    """
+    if not text:
+        return text
+    # Find last occurrence of sentence-ending punctuation
+    last_dot = max(text.rfind('.'), text.rfind('?'), text.rfind('!'))
+    if last_dot == -1 or last_dot < len(text) - 10:
+        # If there's punctuation reasonably near the end, keep full text.
+        # Otherwise, if text ends with '...' or is truncated, return up to last sentence.
+        if last_dot != -1:
+            return text[: last_dot + 1].strip()
+        return text.strip()
+    return text.strip()
+
+
+def get_groq_api_key_interactive() -> Optional[str]:
+    """Obtain GROQ API key from environment, well-known files, or interactively from user.
+
+    This does not persist the key into the repository. It offers to save the
+    key to the user's home directory (~/.groq_api_key) with restrictive
+    permissions for convenience.
+    """
+    # 1) environment
+    key = os.environ.get("GROQ_API_KEY")
+    if key:
+        return key
+
+    # 2) Check common files: current dir and home dir
+    home_file = os.path.join(os.path.expanduser("~"), ".groq_api_key")
+    local_file = os.path.join(os.path.dirname(__file__), ".groq_api_key")
+    for path in (local_file, home_file):
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    k = f.read().strip()
+                    if k:
+                        os.environ["GROQ_API_KEY"] = k
+                        return k
+        except Exception:
+            continue
+
+    # 3) Interactive prompt (if running interactively)
+    try:
+        print("⚠️  GROQ_API_KEY environment variable not set.")
+        key_input = input("Paste your GROQ API key now (or press Enter to skip): ").strip()
+        if not key_input:
+            return None
+
+        # Offer to save to home file
+        save_choice = input(f"Save this key to {home_file} for future runs? (y/N): ").strip().lower()
+        if save_choice == 'y':
+            try:
+                with open(home_file, "w", encoding="utf-8") as f:
+                    f.write(key_input)
+                try:
+                    os.chmod(home_file, 0o600)
+                except Exception:
+                    pass
+                print(f"🔐 Saved key to {home_file} (permissions: 600 attempted)")
+            except Exception as e:
+                print(f"⚠️  Could not save key: {e}")
+
+        os.environ["GROQ_API_KEY"] = key_input
+        return key_input
+    except Exception:
+        # Non-interactive environment: give up
+        return None
+
 # Local cache for domain classifications to avoid repeated LLM calls
 DOMAIN_CACHE_FILE = os.path.join(os.path.dirname(__file__), "domain_cache.json")
 
@@ -64,9 +164,12 @@ def generate_with_groq(prompt: str, model: str = None, max_tokens: int = 1024, t
 
     Returns the generated text, or raises an exception on HTTP/errors.
     """
-    api_key = GROQ_API_KEY
+    api_key = os.environ.get("GROQ_API_KEY") or GROQ_API_KEY
     if not api_key:
-        raise RuntimeError("GROQ_API_KEY environment variable not set")
+        # Attempt to load interactively or from well-known files
+        api_key = get_groq_api_key_interactive()
+        if not api_key:
+            raise RuntimeError("GROQ_API_KEY environment variable not set")
 
     model = model or GROQ_MODEL
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -724,45 +827,105 @@ def rule_based_summary(author_name: str, papers: List[dict]) -> str:
 # -----------------------------
 # LLM Summary Generation
 # -----------------------------
-def generate_paper_summary(paper: dict, max_tokens: int = 300) -> str:
-    """Generate a summary for an individual paper using LLM if full-text available."""
-    title = paper.get("title", "Untitled")
-    content = paper.get("full_content", "") or paper.get("abstract", "")
-    
+def generate_paper_summary(paper: dict, max_tokens: int = 800) -> str:
+    """Generate a summary for an individual paper.
+
+    Behavior:
+    - If the paper has full text and content is sufficiently long, use the LLM
+      to produce a detailed, structured summary. The default `max_tokens` has
+      been increased to 800 to allow richer, multi-paragraph summaries.
+    - If the LLM call fails or returns nothing, fall back to a truncated
+      excerpt of the full content (keeps earlier fallback behaviour).
+    - If there's no full text, return the full abstract (not truncated) so the
+      user sees the complete author-provided summary.
+    """
+    title = paper.get("title") or paper.get("display_name") or "Untitled"
+    raw_content = paper.get("full_content", "") or paper.get("abstract", "")
+    content = sanitize_text(raw_content)
+
     if not content or len(content) < 100:
         return "No content available for summarization."
-    
-    # Use LLM for full-text papers
+
+    # Use LLM for full-text papers: produce a richer, structured summary
     if paper.get("has_fulltext") and len(content) > 1000:
-        prompt = f"""Summarize the following research paper in 3-4 sentences, focusing on:
-1. Main contribution/novelty
-2. Methodology/approach
-3. Key results/findings
+        # Larger, explicit prompt asking for structured sections so the LLM
+        # returns a thorough, useful summary rather than a short blurb.
+        prompt = f"""
+You are an expert research summarizer. Read the content below and produce a detailed, clear
+summary of this research paper. Provide a multi-paragraph summary (approx. 250-600 words
+or up to the token limit) with the following labeled sections when applicable:
 
-Paper: {title}
+- Background: One or two sentences putting the work in context.
+- Main contribution(s): Clearly state the novel idea(s) or contribution(s).
+- Methodology/Approach: Describe the methods, experimental setup or key algorithms.
+- Results/Findings: Summarize principal results, empirical numbers and comparisons.
+- Limitations/Assumptions: Any important constraints or caveats.
+- Implications/Impact: Why this matters and possible future directions.
 
-Content:
-{content[:2000]}
+Paper Title: {title}
 
-Provide a concise summary:"""
-        
+Content (truncated for prompt):
+{content[:4000]}
+
+Write the summary now, using the labeled sections above. Keep it technical and precise.
+"""
+
         try:
             summary = generate_with_groq(prompt, model=GROQ_MODEL, max_tokens=max_tokens, temperature=0.2)
-            return summary.strip()
-        except Exception as e:
-            # Fallback to abstract
-            return content[:600] + "..." if len(content) > 600 else content
-    else:
-        # Return abstract for papers without full-text
-        return content[:600] + "..." if len(content) > 600 else content
+            if summary and str(summary).strip():
+                summary_text = str(summary).strip()
+                # Remove repeated 'Summary:' headings if present
+                summary_text = re.sub(r'^\s*Summary\s*:\s*', '', summary_text, flags=re.I)
+                # Sanitize any XML/HTML tags that may appear
+                summary_text = sanitize_text(summary_text)
+                # Trim trailing incomplete fragment to last full sentence
+                summary_text = trim_to_last_sentence(summary_text)
+                return summary_text
+            # fall through to fallback below if empty
+        except Exception:
+            # If LLM fails, fall back to showing an excerpt of the content
+            pass
+
+        # Fallback: return a truncated, sanitized excerpt of the full content
+        excerpt = content[:600]
+        excerpt = trim_to_last_sentence(excerpt)
+        return excerpt + ("..." if len(content) > len(excerpt) else "")
+
+    # No full-text available: return the full abstract (sanitized)
+    return sanitize_text(content)
 
 
 def classify_paper_domains(papers: List[dict], batch_size: int = 10) -> List[dict]:
-    """Classify papers into domains using LLM.
-    
-    Returns papers with added 'domains' field (list of domain strings).
+    """Classify papers into domains using an LLM with caching.
+
+    Implementation notes (high level, non-invasive comments):
+    - The function defines a small, fixed taxonomy (`allowed_domains`) that the
+      LLM is constrained to choose from. This makes labels predictable and
+      consistent with the UI.
+    - Papers are processed in batches (default 10) to reduce the number of LLM
+      calls and stay within rate limits. Each batch becomes one prompt to the
+      LLM asking for a JSON array of domain assignments.
+    - Before calling the LLM for a paper, we check a local cache stored in
+      `domain_cache.json` (loaded via `load_domain_cache()`). Cached results
+      are applied immediately and skip the LLM call for that paper.
+    - Cache key selection: prefer `openalex_id` (most stable), else DOI, else
+      MD5(title). This keeps the cache stable across runs and avoids
+      reclassification of unchanged works.
+    - For LLM input we use the paper `title` and a truncated `abstract` (first
+      ~500 chars). This provides context while keeping prompts compact.
+    - The prompt requests 1-2 domains and a confidence value per paper, and the
+      code expects strictly parseable JSON in response.
+    - After a successful LLM response, the function assigns `domains` and
+      `domain_confidence` to each paper, updates the cache, and persists it to
+      disk after each batch (so progress isn't lost on interruption).
+    - If the LLM call fails for a batch, the function falls back to assigning
+      the domain `"other"` to uncached items to keep processing moving.
+
+    The block below is the original implementation with inline comments that
+    explain each step; no behavior is changed.
     """
-    # Domain list (expand as needed)
+
+    # Domain list (expand as needed) - this is the target taxonomy the LLM will use
     allowed_domains = [
         "machine learning", "deep learning", "natural language processing",
         "computer vision", "edge computing", "cloud computing", 
@@ -772,40 +935,47 @@ def classify_paper_domains(papers: List[dict], batch_size: int = 10) -> List[dic
         "bioinformatics", "healthcare", "other"
     ]
     
+    # Informational log for the user (shows which cache file will be used)
     print(f"🏷️  Classifying {len(papers)} papers into domains using LLM... (cache: {DOMAIN_CACHE_FILE})")
 
+    # Load persistent domain cache (avoids repeated LLM calls)
     cache = load_domain_cache()
 
+    # Process papers in batches to limit number of LLM calls
     for i in range(0, len(papers), batch_size):
         batch = papers[i:i+batch_size]
 
-        # Build batch items for papers not present in cache
+        # items: list of dicts that will be sent to the LLM for classification
+        # abs_indices: parallel list of (absolute_index, cache_key) for mapping results back
         items = []
         abs_indices = []
         for j, p in enumerate(batch):
             abs_idx = i + j
-            # Determine a cache key: prefer OpenAlex id, then DOI, then title hash
+            # Choose a stable cache key: OpenAlex id > DOI > title-hash
             key = p.get("openalex_id") or p.get("doi") or hashlib.md5((p.get("title","") or "").encode()).hexdigest()
 
             if key in cache:
-                # assign cached values immediately
+                # If classification exists in cache, apply it and skip LLM
                 try:
                     papers[abs_idx]["domains"] = cache[key].get("domains", ["other"])[:2]
                     papers[abs_idx]["domain_confidence"] = cache[key].get("confidence", 0.0)
                 except Exception:
+                    # Safety net: on any cache parse error, assign 'other'
                     papers[abs_idx]["domains"] = ["other"]
                 continue
 
+            # Prepare minimal context for LLM: title + short abstract slice
             title = p.get("title", "")
             abstract = p.get("abstract", "")[:500]
             items.append({"id": abs_idx, "title": title, "text": abstract})
             abs_indices.append((abs_idx, key))
 
+        # If all papers in this batch were cached, skip the LLM call
         if not items:
-            # nothing to call LLM for in this batch
             print(f"   Skipped batch {i//batch_size + 1}: all cached")
             continue
 
+        # Build a compact JSON snippet for the prompt so the LLM receives structured input
         items_json = json.dumps(items, indent=2)
         prompt = f"""You are a research paper classifier. Given papers (id, title, text), assign each to 1-2 domains from this list:
 {', '.join(allowed_domains)}
@@ -818,10 +988,11 @@ Papers:
 Output JSON:"""
 
         try:
+            # Call the LLM (with retries handled inside generate_with_groq)
             response = generate_with_groq(prompt, model=GROQ_MODEL, max_tokens=800, temperature=0.1)
             result = json.loads(response.strip())
 
-            # Assign domains to papers and update cache
+            # Map LLM response back to paper objects and update the cache
             for item in result:
                 paper_idx = item.get("id", -1)
                 domains = item.get("domains", ["other"])[:2]
@@ -830,21 +1001,21 @@ Output JSON:"""
                     papers[paper_idx]["domains"] = domains
                     papers[paper_idx]["domain_confidence"] = confidence
 
-                    # find the cache key for this abs index
+                    # Update cache using the corresponding key for this absolute index
                     for abs_idx, key in abs_indices:
                         if abs_idx == paper_idx:
                             cache[key] = {"domains": domains, "confidence": confidence}
                             break
 
         except Exception as e:
+            # On any failure (network, parse error, rate limit after retries), mark uncached items as 'other'
             print(f"⚠️  Domain classification failed for batch {i//batch_size + 1}: {e}")
-            # Fallback: assign "other" for uncached items
             for abs_idx, key in abs_indices:
                 if "domains" not in papers[abs_idx]:
                     papers[abs_idx]["domains"] = ["other"]
                     cache[key] = {"domains": ["other"], "confidence": 0.0}
 
-        # Persist cache after each batch to avoid redoing work on interruption
+        # Persist cache after each batch so work isn't lost on interruption
         try:
             save_domain_cache(cache)
         except Exception:
@@ -852,7 +1023,7 @@ Output JSON:"""
 
         print(f"   Classified {min(i+batch_size, len(papers))}/{len(papers)} papers...")
         
-        # Small delay between batches to avoid rate limiting
+        # Small delay between batches to be polite to the LLM provider and avoid rate limiting
         if i + batch_size < len(papers):
             time.sleep(1)
 
@@ -900,13 +1071,38 @@ def compute_publication_stats(papers: List[dict], author_info: dict) -> dict:
 
 def generate_author_summary(author_name: str, author_info: dict, papers: List[dict]) -> str:
     """Generate comprehensive author summary using advanced LLM."""
-    # Prepare paper information - use a representative sample for LLM processing
+    # Prepare paper information - choose a mix of most-cited and most-recent
+    # papers so the summary captures both impact and recent directions.
     sample_size = min(20, len(papers))
-    top_papers = sorted(papers, key=lambda x: x.get("cited_by_count", 0), reverse=True)[:sample_size]
-    
+    # Heuristic: pick up to 60% top-cited, remainder recent (by year)
+    num_cited = min(max(5, sample_size * 60 // 100), sample_size)
+    num_recent = sample_size - num_cited
+
+    cited_sorted = sorted(papers, key=lambda x: x.get("cited_by_count", 0), reverse=True)
+    recent_sorted = sorted(papers, key=lambda x: x.get("year") or 0, reverse=True)
+
+    selected = []
+    # Add top-cited
+    for p in cited_sorted:
+        if len(selected) >= num_cited:
+            break
+        selected.append(p)
+
+    # Add recent, avoiding duplicates
+    for p in recent_sorted:
+        if len(selected) >= sample_size:
+            break
+        if p in selected:
+            continue
+        selected.append(p)
+
+    top_papers = selected
+
     papers_text = []
     for i, p in enumerate(top_papers, 1):
-        content = p.get("full_content", "")[:800]
+        # Use a longer snippet from full content if available to give LLM enough
+        # context for author-level synthesis (up to ~2000 chars per paper).
+        content = p.get("full_content", "")[:2000]
         
         # Format co-authors
         coauthors_str = ""
@@ -1099,8 +1295,11 @@ def main():
         for source, count in source_counts.items():
             print(f"   - {source}: {count} papers")
     
-    # Step 4a: Classify papers into domains
-    papers = classify_paper_domains(papers)
+    # Step 4a: (disabled) Classify papers into domains
+    # NOTE: Domain classification is intentionally disabled per user request.
+    # If you want to re-enable LLM-based domain classification, uncomment
+    # the following line.
+    # papers = classify_paper_domains(papers)
     
     # Step 4b: Compute publication statistics
     print("\n📊 Computing publication statistics...")
@@ -1160,95 +1359,64 @@ def main():
     print("=" * 80)
     print(summary)
     
+    # Instead of grouping by domain, show all papers sequentially sorted by
+    # citation count (most cited first). Domain classification is disabled, so
+    # we present a simple, reproducible paper list with summaries.
     print("\n" + "=" * 80)
-    print(f"📚 PAPERS BY DOMAIN ({len(papers)} total)")
+    print(f"📚 PAPERS ({len(papers)} total) — sorted by citations (high → low)")
     print("=" * 80)
-    
-    # Group papers by domain
-    domain_groups = {}
-    for paper in papers:
-        domains = paper.get("domains", ["other"])
-        primary_domain = domains[0] if domains else "other"
-        if primary_domain not in domain_groups:
-            domain_groups[primary_domain] = []
-        domain_groups[primary_domain].append(paper)
-    
-    # Sort domains by paper count (descending), but move "other" to the end
-    sorted_domains = sorted(domain_groups.items(), key=lambda x: len(x[1]), reverse=True)
-    
-    # Move "other" domain to the end
-    other_domain = None
-    filtered_domains = []
-    for domain, papers in sorted_domains:
-        if domain.lower() == "other":
-            other_domain = (domain, papers)
-        else:
-            filtered_domains.append((domain, papers))
-    
-    # Append "other" at the end if it exists
-    if other_domain:
-        filtered_domains.append(other_domain)
-    
-    sorted_domains = filtered_domains
-    
-    print(f"\n📊 Found {len(sorted_domains)} domains. Showing top papers per domain.\n")
-    
-    # Display domains one at a time with pagination
-    for domain_idx, (domain, domain_papers) in enumerate(sorted_domains, 1):
-        print(f"\n{'='*80}")
-        print(f"📂 DOMAIN {domain_idx}/{len(sorted_domains)}: {domain.upper()} ({len(domain_papers)} papers)")
-        print(f"{'='*80}")
-        
-        # Sort by citations within domain
-        domain_papers.sort(key=lambda x: x.get("cited_by_count", 0), reverse=True)
-        
-        for i, p in enumerate(domain_papers[:10], 1):  # Show top 10 per domain
-            print(f"\n{i}. {p['title']}")
+
+    # Sort all papers by citation count (descending)
+    all_sorted = sorted(papers, key=lambda x: x.get("cited_by_count", 0), reverse=True)
+
+    # Paginate output: show 10 papers at a time
+    page_size = 10
+    total = len(all_sorted)
+    for start in range(0, total, page_size):
+        chunk = all_sorted[start:start + page_size]
+        for offset, p in enumerate(chunk, start + 1):
+            # Robust title fallback: avoid printing 'None'
+            title = p.get('title') or p.get('display_name') or 'Untitled'
+            print(f"\n{offset}. {title}")
             print(f"   📅 Year: {p.get('year', 'N/A')} | 📊 Citations: {p.get('cited_by_count', 0)}")
             print(f"   🏛️  Venue: {p.get('venue', 'N/A')}")
-            
+
             # Show content source
             if p.get("content_source"):
                 print(f"   📄 Content Source: {p['content_source']}")
-            
-            # Show co-authors with affiliations
+
+            # Show co-authors with affiliations (top 5)
             if p.get("coauthors"):
                 print(f"   👥 Co-authors ({len(p['coauthors'])} total):")
-                # Show top 5 co-authors with affiliations
-                for idx, ca in enumerate(p["coauthors"][:5], 1):
+                for cidx, ca in enumerate(p["coauthors"][:5], 1):
                     name = ca.get("name", "Unknown")
                     affiliations = ca.get("affiliations", ["Unknown"])
-                    affil_str = ", ".join(affiliations[:2])  # Show up to 2 affiliations
-                    print(f"      {idx}. {name} ({affil_str})")
+                    affil_str = ", ".join(affiliations[:2])
+                    print(f"      {cidx}. {name} ({affil_str})")
                 if len(p["coauthors"]) > 5:
                     print(f"      ... and {len(p['coauthors']) - 5} more co-authors")
-            
+
             if p.get("arxiv_id"):
                 print(f"   📄 arXiv: {p['arxiv_id']}")
             if p.get("doi"):
                 print(f"   🔗 DOI: {p['doi']}")
-            
-            # Generate and show paper summary
+
+            # Generate and show paper summary (use larger token budget)
             print(f"   📝 Summary:")
-            paper_summary = generate_paper_summary(p, max_tokens=200)
-            # Indent summary
+            paper_summary = generate_paper_summary(p, max_tokens=800)
             for line in paper_summary.split('\n'):
                 print(f"      {line}")
-        
-        if len(domain_papers) > 10:
-            print(f"\n   ... and {len(domain_papers) - 10} more papers in this domain")
-        
-        # Pause before next domain (except for last one)
-        if domain_idx < len(sorted_domains):
-            print(f"\n{'─'*80}")
+
+        # Pagination prompt (unless this was the last page)
+        if start + page_size < total:
             try:
-                user_input = safe_input(f"Press Enter to see next domain ({domain_idx+1}/{len(sorted_domains)}) or 'q' to skip remaining: ", "")
-                if user_input.strip().lower() == 'q':
-                    remaining = len(sorted_domains) - domain_idx
-                    print(f"\n⏭️  Skipping {remaining} remaining domain(s)...")
+                user_input = safe_input(f"\nPress Enter to see next {page_size} papers ({start + page_size + 1}-{min(total, start + page_size * 2)}) or 'q' to quit: ", "").strip()
+                if user_input.lower() == 'q':
+                    print(f"\n⏭️  Skipping remaining {total - (start + page_size)} paper(s)...")
                     break
-            except:
-                pass  # Continue if input fails
+            except Exception:
+                # Non-interactive environment: continue automatically
+                pass
     
     print("\n" + "=" * 80)
     print("✅ Analysis Complete!")
