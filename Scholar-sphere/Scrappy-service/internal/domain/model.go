@@ -1,78 +1,105 @@
 package domain
 
-// This file defines the Go structs equivalent to your Java Spring models.
-// It correctly handles both full and "dehydrated" entity representations from the OpenAlex API.
+import "time"
 
 // --- Core Entities ---
 
-// Author corresponds to your Author.java entity.
+// Author corresponds to the Author entity from OpenAlex.
 type Author struct {
-	ID                      string                 `json:"id"`
-	DisplayName             string                 `json:"display_name"`
-	DisplayNameAlternatives []string               `json:"display_name_alternatives"`
-	Orcid                   string                 `json:"orcid"`
-	CitedByCount            int                    `json:"cited_by_count"`
-	WorksCount              int                    `json:"works_count"`
-	WorksApiUrl             string                 `json:"works_api_url"`
-	CreatedDate             string                 `json:"created_date"`
-	UpdatedDate             string                 `json:"updated_date"`
-	CountsByYear            []CountsByYear         `json:"counts_by_year"`
-	LastKnownInstitution    *DehydratedInstitution `json:"last_known_institution"` // CORRECTED
-	Affiliations            []Affiliation          `json:"affiliations"`
-	Ids                     map[string]string      `json:"ids"`
-	// need to add flag fr profile generated
-	// last updated profile ig
+	ID                      string                   `json:"id"`
+	DisplayName             string                   `json:"display_name"`
+	DisplayNameAlternatives []string                 `json:"display_name_alternatives"`
+	Orcid                   string                   `json:"orcid"`
+	CitedByCount            int                      `json:"cited_by_count"`
+	WorksCount              int                      `json:"works_count"`
+	WorksApiUrl             string                   `json:"works_api_url"`
+	CreatedDate             string                   `json:"created_date"`
+	UpdatedDate             string                   `json:"updated_date"`
+	CountsByYear            []CountsByYear           `json:"counts_by_year"`
+	LastKnownInstitutions   []*DehydratedInstitution `json:"last_known_institutions"`
+	Affiliations            []Affiliation            `json:"affiliations"`
+	Ids                     map[string]string        `json:"ids"`
+	SummaryStats            AuthorStats              `json:"summary_stats"` // ADDED: Key author metrics
+	Topics                  []Topic                  `json:"topics"`        // MODIFIED: Replaced Concepts with the richer Topics struct
+	LastFetched             time.Time                `json:"-"`
 }
 
-// Institution corresponds to your Institution.java entity.
+// Institution corresponds to the Institution entity from OpenAlex.
 type Institution struct {
-	ID                      string                  `json:"id"`
-	Ror                     string                  `json:"ror"`
-	DisplayName             string                  `json:"display_name"`
-	DisplayNameAcronyms     []string                `json:"display_name_acronyms"`
-	DisplayNameAlternatives []string                `json:"display_name_alternatives"`
-	Type                    string                  `json:"type"`
-	CountryCode             string                  `json:"country_code"`
-	HomepageUrl             string                  `json:"homepage_url"`
-	ImageUrl                string                  `json:"image_url"`
-	ImageThumbnailUrl       string                  `json:"image_thumbnail_url"`
-	International           map[string]string       `json:"international"`
-	WorksCount              int                     `json:"works_count"`
-	CitedByCount            int                     `json:"cited_by_count"` // CORRECTED
-	WorksApiUrl             string                  `json:"works_api_url"`
-	CreatedDate             string                  `json:"created_date"`
-	UpdatedDate             string                  `json:"updated_date"`
-	Ids                     map[string]string       `json:"ids"`
-	AssociatedInstitutions  []DehydratedInstitution `json:"associated_institutions"` // CORRECTED
+	// ... (no changes to this struct) ...
 }
 
-// Work corresponds to your Work.java entity.
+// Work corresponds to the Work entity from OpenAlex.
 type Work struct {
-	ID                        string                  `json:"id"`
-	Title                     string                  `json:"title"`
-	Doi                       string                  `json:"doi"`
-	PublicationDate           string                  `json:"publication_date"`
-	PublicationYear           int                     `json:"publication_year"`
-	CitedByCount              int                     `json:"cited_by_count"`
-	HasFulltext               bool                    `json:"has_fulltext"`
-	Language                  string                  `json:"language"`
-	License                   string                  `json:"license"`
-	IsParatext                bool                    `json:"is_paratext"`
-	IsRetracted               bool                    `json:"is_retracted"`
-	CreatedDate               string                  `json:"created_date"`
-	UpdatedDate               string                  `json:"updated_date"`
-	Ids                       map[string]string       `json:"ids"`
-	Authorships               []Authorship            `json:"authorships"`
-	ReferencedWorks           []string                `json:"referenced_works"`
-	RelatedWorks              []string                `json:"related_works"`
-	CorrespondingInstitutions []DehydratedInstitution `json:"corresponding_institutions"`
-	Locations                 []Location              `json:"locations"`
-	PrimaryLocation           *Location               `json:"primary_location"` // Use pointer for optional object
-	BestOaLocation            *Location               `json:"best_oa_location"` // Use pointer for optional object, CORRECTED tag
-	AbstractInvertedIndex     map[string][]int        `json:"abstract_inverted_index"`
+	ID                          string          `json:"id"`
+	Title                       string          `json:"title"`
+	Doi                         string          `json:"doi"`
+	Type                        string          `json:"type"` // ADDED: Critical context (journal-article, etc.)
+	PublicationDate             string          `json:"publication_date"`
+	PublicationYear             int             `json:"publication_year"`
+	CitedByCount                int             `json:"cited_by_count"`
+	IsRetracted                 bool            `json:"is_retracted"`
+	ReferencedWorks             []string        `json:"referenced_works"`
+	RelatedWorks                []string        `json:"related_works"` // ADDED: Important new relationship
+	Locations                   []Location      `json:"locations"`
+	PrimaryLocation             *Location       `json:"primary_location"`
+	BestOaLocation              *Location       `json:"best_oa_location"`
+	Grants                      []Grant         `json:"grants"`                        // ADDED: Links to funding
+	SustainableDevelopmentGoals []DehydratedSDG `json:"sustainable_development_goals"` // ADDED: Links to UN Goals
+	Topics                      []Topic         `json:"topics"`                        // MODIFIED: Replaced Concepts with the richer Topics struct
+	Authorships                 []Authorship    `json:"authorships"`
 }
 
-// --- Dehydrated (Summary) Entities ---
+// --- Topic Hierarchy Structs (NEW) ---
+
+// TopicParent is a generic struct for the hierarchical parents of a topic.
+type TopicParent struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+}
+
+// Topic represents a single topic with its full hierarchy and score.
+type Topic struct {
+	ID          string      `json:"id"`
+	DisplayName string      `json:"display_name"`
+	Count       int         `json:"count"`
+	Score       float32     `json:"score"`
+	Subfield    TopicParent `json:"subfield"`
+	Field       TopicParent `json:"field"`
+	Domain      TopicParent `json:"domain"`
+}
+
+// --- Other New Structs for Added Attributes ---
+
+// Grant represents a funding grant associated with a work.
+type Grant struct {
+	Funder            string `json:"funder"`
+	FunderDisplayName string `json:"funder_display_name"`
+	AwardID           string `json:"award_id"`
+}
+
+// DehydratedSDG represents a UN Sustainable Development Goal.
+type DehydratedSDG struct {
+	ID          string  `json:"id"`
+	DisplayName string  `json:"display_name"`
+	Score       float32 `json:"score"`
+}
+
+// AuthorStats contains key metrics for an author's impact.
+type AuthorStats struct {
+	HIndex   int `json:"h_index"`
+	I10Index int `json:"i10_index"`
+}
+
+// Concept is still needed for the Author's x_concepts field.
+type Concept struct {
+	ID          string  `json:"id"`
+	DisplayName string  `json:"display_name"`
+	Level       int     `json:"level"`
+	Score       float64 `json:"score"`
+}
+
+// --- Dehydrated, Nested, and Helper Structs ---
 
 // DehydratedInstitution represents the summary view of an institution.
 type DehydratedInstitution struct {
@@ -123,8 +150,18 @@ type Authorship struct {
 
 // Location represents a host or repository where a Work is located.
 type Location struct {
-	IsOa           bool   `json:"is_oa"`
-	LandingPageUrl string `json:"landing_page_url"`
-	PdfUrl         string `json:"pdf_url"`
-	License        string `json:"license"`
+	IsOa           bool    `json:"is_oa"`
+	LandingPageUrl string  `json:"landing_page_url"`
+	PdfUrl         string  `json:"pdf_url"`
+	License        string  `json:"license"`
+	Source         *Source `json:"source"` // MODIFIED: Changed from interface{} to specific type
+}
+
+// Concept represents a dehydrated concept associated with an author or work,
+// including its relevance score.
+
+type Source struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Type        string `json:"type"`
 }

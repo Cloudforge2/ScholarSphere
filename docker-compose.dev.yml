@@ -1,0 +1,14 @@
+# docker-compose.dev.yml
+version: '3.9'
+
+services:
+  scrappy:
+    # ... scrappy config ...
+
+  graph-service:
+    # ... graph-service config ...
+  
+  summary-service:
+    # ... summary-service config ...
+
+  # We can even re-define gateway-service here to add the dependency back if needed for a full stack dev environment

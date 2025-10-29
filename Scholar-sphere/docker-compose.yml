@@ -121,6 +121,9 @@ services:
     build:
       context: ./Summary-service 
     container_name: summary-service
+    environment:
+      GROQ_API_KEY: your_groq_api_key_here
+      
     ports:
       - "8085:8085"
     networks:

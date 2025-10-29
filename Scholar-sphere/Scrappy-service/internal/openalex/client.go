@@ -153,6 +153,36 @@ func (c *Client) FetchRecentWorksByAuthorID(authorID string, maxResults int) ([]
 	return apiResponse.Results, nil
 }
 
+func (c *Client) FetchAllWorksByAuthorID(authorID string) ([]domain.Work, error) {
+	var allWorks []domain.Work
+	cursor := "*"
+	perPage := 200
+
+	for {
+		url := fmt.Sprintf("%s/works?filter=author.id:%s&per-page=%d&cursor=%s", openAlexAPIBaseURL, authorID, perPage, url.QueryEscape(cursor))
+
+		var resp struct {
+			Results []domain.Work `json:"results"`
+			Meta    struct {
+				NextCursor string `json:"next_cursor"`
+			} `json:"meta"`
+		}
+
+		if err := c.fetchAndDecode(url, &resp); err != nil {
+			return nil, err
+		}
+
+		allWorks = append(allWorks, resp.Results...)
+
+		if resp.Meta.NextCursor == "" {
+			break
+		}
+		cursor = resp.Meta.NextCursor
+	}
+
+	return allWorks, nil
+}
+
 type Publication struct {
 	Title                 string           `json:"title"`
 	PublicationYear       int              `json:"publication_year"`

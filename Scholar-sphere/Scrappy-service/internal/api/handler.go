@@ -11,6 +11,7 @@ import (
 	"time"
 
 	// Use your actual module paths here
+	"github.com/Cloudforge2/scrappy/internal/domain"
 	"github.com/Cloudforge2/scrappy/internal/openalex"
 	"github.com/Cloudforge2/scrappy/internal/semanticscholar"
 	"github.com/Cloudforge2/scrappy/internal/storage"
@@ -69,15 +70,27 @@ func (h *APIHandler) FetchAndSaveAuthorByNameHandler(w http.ResponseWriter, r *h
 
 	// Just return the authors found by their name and ID
 	type authorResponse struct {
-		ID          string `json:"id"`
-		DisplayName string `json:"displayName"`
+		ID                   string `json:"id"`
+		DisplayName          string `json:"displayName"`
+		LastKnownInstitution string `json:"lastKnownInstitution,omitempty"`
+		CitedByCount         int    `json:"citedByCount,omitempty"`
+		UpdatedDate          string `json:"updatedDate,omitempty"`
+		Orcid                string `json:"orcid,omitempty"`
 	}
 
 	var resp []authorResponse
 	for _, a := range authors {
+		var lastInst string
+		if len(a.LastKnownInstitutions) > 0 && a.LastKnownInstitutions[0] != nil {
+			lastInst = a.LastKnownInstitutions[0].DisplayName
+		}
 		resp = append(resp, authorResponse{
-			ID:          a.ID,
-			DisplayName: a.DisplayName,
+			ID:                   a.ID,
+			DisplayName:          a.DisplayName,
+			LastKnownInstitution: lastInst,
+			CitedByCount:         a.CitedByCount,
+			UpdatedDate:          a.UpdatedDate,
+			Orcid:                a.Orcid,
 		})
 	}
 
@@ -85,83 +98,102 @@ func (h *APIHandler) FetchAndSaveAuthorByNameHandler(w http.ResponseWriter, r *h
 }
 
 func (h *APIHandler) FetchAndSaveWorksByAuthorHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. Get the author ID from the query parameters (e.g., ?id=A2043598041)
+	// 1. Get author ID and fetch the author (same as before)
 	authorID := r.URL.Query().Get("id")
 	if authorID == "" {
-		http.Error(w, "Missing 'id' query parameter", http.StatusBadRequest)
+		respondWithError(w, http.StatusBadRequest, "Missing 'id' query parameter")
 		return
 	}
 
-	log.Printf("Received request to fetch works for author ID: %s", authorID)
-	// 2. Use the OpenAlex client to fetch the data
+	log.Printf("Received request to ingest all works for author ID: %s", authorID)
 	author, err := h.alexClient.FetchAuthorById(authorID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch author from OpenAlex: %v", err), http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch author from OpenAlex: %v", err))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	// 2. Save the author object itself synchronously. This is fast and should be done immediately.
+	// We'll use the request's context for this part.
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
 	if err := h.repo.SaveAuthor(ctx, author); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to save author to database: %v", err), http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save author to database: %v", err))
 		return
 	}
+	log.Printf("Successfully saved author: %s (ID: %s)", author.DisplayName, author.ID)
 
-	// log.Printf("Successfully saved author: %s (ID: %s)", author.DisplayName, author.ID)
-
-	// // Optionally, you can fetch works after saving the author, or just respond with success
-	// w.Header().Set("Content-Type", "application/json")
-	// w.WriteHeader(http.StatusOK)
-	// json.NewEncoder(w).Encode(map[string]string{
-	// 	"message": "Author successfully fetched and saved",
-	// 	"id":      author.ID,
-	// 	"name":    author.DisplayName,
-	// })
-
-	// 2. Use the OpenAlex client to fetch the data
-	works, err := h.alexClient.FetchRecentWorksByAuthorID(authorID, 50)
+	// 3. Fetch ALL works for the author (same as before)
+	works, err := h.alexClient.FetchAllWorksByAuthorID(authorID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch works from OpenAlex: %v", err), http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch works from OpenAlex: %v", err))
 		return
 	}
-
 	if len(works) == 0 {
-		// It's not an error if an author has no works, so we return a success response.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message":        "Author has no works, or author not found.",
-			"worksProcessed": 0,
-		})
+		respondWithJSON(w, http.StatusOK, map[string]interface{}{"message": "Author has no works."})
 		return
 	}
 
-	// 3. Loop through all fetched works and save each one to the database.
-	ctx, cancel = context.WithTimeout(r.Context(), 30*time.Second) // Increased timeout for potentially many works
-	defer cancel()
+	// --- NEW ASYNCHRONOUS LOGIC STARTS HERE ---
 
+	const initialBatchSize = 30
+	var initialWorks []domain.Work
+	var backgroundWorks []domain.Work
+
+	// 4. Split the works into an initial batch and a background batch.
+	if len(works) > initialBatchSize {
+		initialWorks = works[:initialBatchSize]
+		backgroundWorks = works[initialBatchSize:]
+	} else {
+		initialWorks = works
+		// backgroundWorks will be empty
+	}
+
+	// 5. Process the initial batch synchronously.
 	var savedCount int
-	for _, work := range works {
+	for _, work := range initialWorks {
 		if err := h.repo.SaveWork(ctx, work); err != nil {
-			// Log the error but continue trying to save other works
-			log.Printf("WARN: Could not save work %s: %v\n", work.Title, err)
+			log.Printf("WARN: Could not save initial work %s: %v\n", work.Title, err)
 			continue
 		}
 		savedCount++
-		log.Printf("Successfully saved work: %s (ID: %s)", work.Title, work.ID)
+	}
+	log.Printf("Synchronously saved initial batch of %d works for author %s.", savedCount, authorID)
+
+	// 6. Launch a goroutine to process the rest of the works in the background.
+	if len(backgroundWorks) > 0 {
+		log.Printf("Launching background task to save remaining %d works.", len(backgroundWorks))
+
+		go func() {
+			// IMPORTANT: We must create a new, independent context for the background task.
+			// The original request's context (r.Context()) will be cancelled as soon as
+			// this handler returns a response.
+			backgroundCtx := context.Background()
+
+			for _, work := range backgroundWorks {
+				// Use a reasonable timeout per work in the background.
+				workCtx, workCancel := context.WithTimeout(backgroundCtx, 30*time.Second)
+
+				if err := h.repo.SaveWork(workCtx, work); err != nil {
+					log.Printf("BACKGROUND ERROR: Could not save work %s: %v\n", work.Title, err)
+				} else {
+					log.Printf("BACKGROUND SUCCESS: Saved work: %s", work.Title)
+				}
+
+				workCancel() // Clean up the context for this single work
+			}
+			log.Printf("Background task finished for author %s. All %d works processed.", authorID, len(works))
+		}()
 	}
 
-	log.Printf("Finished processing. Saved %d out of %d works for author %s.", savedCount, len(works), authorID)
-
-	// 4. Send a success response back to the client
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":        "Successfully fetched and processed works",
-		"worksFetched":   len(works),
-		"worksProcessed": savedCount,
-	})
+	// 7. Immediately respond to the user with a "202 Accepted" status.
+	// This tells them the process has started successfully.
+	responsePayload := map[string]interface{}{
+		"message":          "Request accepted. Initial works are being processed. The rest will be ingested in the background.",
+		"totalWorks":       len(works),
+		"initialBatchSize": savedCount,
+	}
+	respondWithJSON(w, http.StatusAccepted, responsePayload)
 }
 
 func (h *APIHandler) FetchAndSaveWorkByNameHandler(w http.ResponseWriter, r *http.Request) {

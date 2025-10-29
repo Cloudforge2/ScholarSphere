@@ -209,7 +209,7 @@ public String professorSummary(@RequestParam String name, Model model) {
     @GetMapping("/paper-summary")
     public String paperSummary(@RequestParam String title, Model model) {
         try {
-            String url = PAPER_BY_TITLE_URL + URLEncoder.encode(title, StandardCharsets.UTF_8);
+            String url = PAPER_BY_TITLE_URL + title;
             Paper[] papers = restTemplate.getForObject(url, Paper[].class);
 
             if (papers == null || papers.length == 0) {
