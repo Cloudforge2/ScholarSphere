@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Research Domain Graph - ScholarSphere</title>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: #f9fafb;
+        }
+        header {
+            background: linear-gradient(90deg, #0d4f4c, #2563eb);
+            color: white;
+            padding: 16px 40px;
+            font-size: 22px;
+            font-weight: 600;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        #graph-container {
+            width: 90%;
+            height: calc(100vh - 150px);
+            margin: 25px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+<header>
+    Research Domains for <span th:text="${professorName}"></span>
+</header>
+
+<div id="graph-container"></div>
+
+<script th:inline="javascript">
+  /*<![CDATA[*/
+  document.addEventListener('DOMContentLoaded', function() {
+  
+      let graphData = /*[[${graphJson}]]*/ '{"nodes":[],"edges":[]}';
+      if (typeof graphData === "string") graphData = JSON.parse(graphData);
+  
+      const profNode = graphData.nodes.find(n => n.data.type === "prof");
+      const subfields = graphData.nodes.filter(n => n.data.type === "subfield");
+      const edges = graphData.edges;
+  
+      const visNodes = [
+          {
+              id: profNode.data.id,
+              label: profNode.data.label,
+              shape: 'ellipse',
+              color: { background: '#0d4f4c', border: '#083a38' },
+              font: { color: 'white', size: 20, face: 'Inter' },
+              size: 50
+          },
+          ...subfields.map(sf => ({
+              id: sf.data.id,
+              label: sf.data.label,
+              shape: 'box',
+              color: { background: '#2563eb', border: '#1e40af' },
+              font: { color: '#fff', size: 14 },
+              widthConstraint: { maximum: 160 }
+          }))
+      ];
+  
+      const visEdges = edges.map(e => ({
+          from: e.data.source,
+          to: e.data.target,
+          color: { color: '#94a3b8' },
+          width: 1.8,
+          smooth: true
+      }));
+  
+      const container = document.getElementById('graph-container');
+      const data = { nodes: new vis.DataSet(visNodes), edges: new vis.DataSet(visEdges) };
+  
+      const options = {
+          layout: { improvedLayout: true },
+          physics: {
+              enabled: true,
+              solver: 'forceAtlas2Based',
+              forceAtlas2Based: { gravitationalConstant: -80, springLength: 200 },
+              stabilization: { iterations: 250 }
+          },
+          nodes: { shadow: true, borderWidth: 2 },
+          interaction: { hover: true, tooltipDelay: 100 }
+      };
+  
+      const network = new vis.Network(container, data, options);
+  
+      // ✅ Click behavior
+      network.on("click", params => {
+          if (params.nodes.length > 0) {
+              const nodeId = params.nodes[0];
+  
+              // If clicked the professor node — maybe go to their summary (existing behavior)
+              if (nodeId === profNode.data.id) {
+                  window.location.href = '/professor-summary?name=' + encodeURIComponent(profNode.data.label);
+              } 
+              // ✅ If clicked a subfield node — redirect to papers graph
+              else {
+                  const subfieldName = nodeId.replaceAll('_', ' ');
+                  const authorId = profNode.data.id;
+                  const encodedAuthorId = encodeURIComponent(authorId);
+                  const encodedSubfield = encodeURIComponent(subfieldName);
+  
+                  const professorName = encodeURIComponent(profNode.data.label);
+                  const url = `/domain-papers-graph?id=${encodedAuthorId}&subfieldName=${encodedSubfield}&name=${professorName}`;
+
+                  console.log("➡️ Redirecting to:", url);
+                  window.location.href = url;
+              }
+          }
+      });
+  });
+  /*]]>*/
+  </script>
+  
+</body>
+</html>

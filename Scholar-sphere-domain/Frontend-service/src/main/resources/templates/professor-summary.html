@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Professor Summary - ScholarSphere</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f4f8;
+    }
+
+    header {
+      background-color: #2563eb;
+      color: white;
+      padding: 20px 40px;
+      font-size: 24px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .main-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 40px;
+    }
+
+    .container {
+      flex: 1;
+      min-width: 350px;
+      max-width: 500px;
+      background: white;
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    }
+
+    .graph-panel {
+      flex: 1.5;
+      min-width: 400px;
+      height: 600px;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      position: relative;
+    }
+
+    h2 {
+      color: #1f2937;
+      margin-bottom: 10px;
+    }
+
+    .info {
+      font-size: 16px;
+      color: #4b5563;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .summary,
+    .key-areas {
+      font-size: 16px;
+      color: #4b5563;
+      line-height: 1.7;
+      margin-top: 20px;
+      background: #e0f2fe;
+      padding: 20px;
+      border-radius: 10px;
+    }
+
+    .key-areas ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .error-message {
+      margin-top: 20px;
+      color: #dc2626;
+      font-weight: 600;
+    }
+
+    #graph-container {
+      width: 100%;
+      height: 100%;
+      border-radius: 15px;
+    }
+  </style>
+</head>
+
+<body>
+<header>
+  👨‍🏫 Professor Summary
+</header>
+
+<div class="main-container">
+
+  <!-- Left panel: Professor Info -->
+  <div class="container">
+    <!-- Error message -->
+    <div class="error-message" th:if="${error}">
+      <p th:text="${error}"></p>
+    </div>
+
+    <!-- Author Profile -->
+    <div th:if="${author}">
+      <h2 th:text="'Prof. ' + ${author}">Professor Name</h2>
+
+      <div class="info">
+        <p><strong>Affiliation:</strong> <span th:text="${affiliation}">Institution</span></p>
+        <p><strong>Total Publications:</strong> <span th:text="${total_publications}">0</span></p>
+        <p><strong>Citation Count:</strong> <span th:text="${citation_count}">0</span></p>
+        <p><strong>h-index:</strong> <span th:text="${h_index}">0</span></p>
+      </div>
+
+      <!-- Research Summary -->
+      <div class="summary" th:if="${summary}">
+        <p th:text="${summary}">Research summary will appear here.</p>
+      </div>
+
+      <!-- Key Research Areas -->
+      <div class="key-areas" th:if="${key_research_areas}">
+        <h3>🔑 Key Research Areas:</h3>
+        <ul>
+          <li th:each="area : ${key_research_areas}" th:text="${area}">Area</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel: Vis.js Graph -->
+  <div class="graph-panel">
+    <div id="graph-container"></div>
+  </div>
+</div>
+
+<!-- VIS.js Graph Script -->
+<script th:inline="javascript">
+/*<![CDATA[*/
+document.addEventListener("DOMContentLoaded", function () {
+    // Get graph data from backend (Spring/Thymeleaf variable)
+    let graphData = /*[[${graphJson}]]*/ '{"nodes":[],"edges":[]}';
+    if (typeof graphData === "string") graphData = JSON.parse(graphData);
+
+    // Convert to Vis.js format
+    const nodes = graphData.nodes.map(n => ({
+        id: n.data.id,
+        label: n.data.label,
+        shape: n.data.type === 'prof' ? 'box' : 'dot',
+        color: n.data.type === 'prof' ? '#2563eb' : '#9333ea',
+        font: { color: 'white', size: n.data.type === 'prof' ? 18 : 14, face: 'Roboto' },
+        borderWidth: 0,
+        size: n.data.type === 'prof' ? 40 : 25,
+        type: n.data.type
+    }));
+
+    const edges = graphData.edges.map(e => ({
+        from: e.data.source,
+        to: e.data.target,
+        color: { color: '#9ca3af' },
+        width: 2,
+        smooth: { type: 'dynamic' }
+    }));
+
+    const container = document.getElementById('graph-container');
+    const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+
+    const options = {
+        layout: {
+            improvedLayout: true
+        },
+        physics: {
+            solver: 'forceAtlas2Based',
+            stabilization: { iterations: 150 },
+            minVelocity: 0.75
+        },
+        nodes: {
+            shadow: true,
+        },
+        edges: {
+            shadow: true,
+        },
+        interaction: {
+            hover: true,
+            tooltipDelay: 150,
+            dragNodes: true
+        }
+    };
+
+    const network = new vis.Network(container, data, options);
+
+    // Center network after stabilization
+    network.once("stabilizationIterationsDone", function () {
+        network.fit({ animation: true });
+    });
+
+    // Node click navigation
+    network.on("click", function (params) {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            const node = data.nodes.get(nodeId);
+            if (node.type === "coauthor") {
+                window.location.href = '/professor-summary?name=' + encodeURIComponent(node.label);
+            }
+        }
+    });
+});
+/*]]>*/
+</script>
+</body>
+</html>

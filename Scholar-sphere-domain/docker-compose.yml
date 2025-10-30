@@ -1,0 +1,125 @@
+version: '3.9'
+
+services:
+  neo4j:
+    platform : linux/amd64
+    image: neo4j:5.23
+    container_name: neo4j-scrappy
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/test123!
+    ports:
+      - "7687:7687"
+      - "7474:7474"  # optional web interface
+    networks:
+      - scholarsphere-net
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "test123!", "RETURN 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mysql:
+    platform : linux/amd64
+    image: mysql:8.0
+    container_name: scholarsphere-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: scholarsphere_db
+      MYSQL_USER: scholar_user
+      MYSQL_PASSWORD: StrongPassword123!
+    ports:
+      - "3306:3306"
+    networks:
+      - scholarsphere-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  scrappy:
+    platform : linux/amd64
+    build: ./Scrappy-service
+    container_name: scrappy
+    restart: unless-stopped
+    environment:
+      NEO4J_URI: bolt://neo4j-scrappy:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: test123!
+    ports:
+      - "8083:8083"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - scholarsphere-net
+
+  graph-service:
+    platform : linux/amd64
+    build: ./Graph-service
+    container_name: graph
+    restart: unless-stopped
+    environment:
+      NEO4J_URI: bolt://neo4j-scrappy:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: test123!
+    ports:
+      - "8082:8082"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - scholarsphere-net
+
+  
+
+
+  frontend-service:
+    platform : linux/amd64
+    build: ./Frontend-service
+    container_name: scholarsphere-frontend
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://scholarsphere-mysql:3306/scholarsphere_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: scholar_user
+      SPRING_DATASOURCE_PASSWORD: StrongPassword123!
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      
+    networks:
+      - scholarsphere-net
+  
+  summary-service:
+    platform : linux/amd64
+    build:
+      context: ./Summary-service 
+    container_name: summary-service
+    environment:
+      GROQ_API_KEY: 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
+      
+    ports:
+      - "8085:8085"
+    networks:
+      - scholarsphere-net
+    restart: unless-stopped
+
+
+# -----------------------------
+# Persistent volumes
+# -----------------------------
+volumes:
+  neo4j-data:
+  mysql-data:
+  postgres-data:
+
+# -----------------------------
+# Persistent network
+# -----------------------------
+networks:
+  scholarsphere-net:
+    driver: bridge
