@@ -73,28 +73,7 @@ services:
     networks:
       - scholarsphere-net
 
-  gateway-service:
-    platform : linux/amd64
-    build: ./Gateway-service
-    container_name: gateway-service
-    restart: unless-stopped
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://scholarsphere-mysql:3306/scholarsphere_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: scholar_user
-      SPRING_DATASOURCE_PASSWORD: StrongPassword123!
-    ports:
-      - "8081:8081"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      graph-service:
-        condition: service_started
-      scrappy:
-        condition: service_started
-      summary-service:
-        condition: service_started
-    networks:
-      - scholarsphere-net
+  
 
 
   frontend-service:
@@ -111,8 +90,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      gateway-service:
-        condition: service_started
+      
     networks:
       - scholarsphere-net
   
@@ -131,6 +109,17 @@ services:
     restart: unless-stopped
 
 
+# -----------------------------
+# Persistent volumes
+# -----------------------------
+volumes:
+  neo4j-data:
+  mysql-data:
+  postgres-data:
+
+# -----------------------------
+# Persistent network
+# -----------------------------
 networks:
   scholarsphere-net:
     driver: bridge

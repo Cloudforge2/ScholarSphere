@@ -60,5 +60,40 @@ public class ProfessorService {
         return exists;
     }
 
+    /**
+     * 1️⃣ Fetch all authors for a given paper ID
+     */
+    public List<Professor> getAuthorsByPaperId(String paperId) {
+        System.out.println("📄 Fetching authors for paper ID: " + paperId);
+        return professorRepository.findAuthorsByPaperId(paperId);
+    }
+
+    /**
+     * 2️⃣ Fetch all coauthors for a given author ID
+     */
+    public List<Professor> getCoauthorsByAuthorId(String authorId) {
+        System.out.println("👥 Fetching coauthors for author ID: " + authorId);
+        return professorRepository.findCoauthorsByAuthorId(authorId);
+    }
+
+    /**
+ * 3️⃣ Fetch all topics for a given author ID
+ */
+public List<String> getTopicsByAuthorId(String authorId) {
+    System.out.println("service: Fetching topics for author ID: " + authorId);
+    return professorRepository.findTopicsByAuthorId(authorId);
+}
+
+/**
+ * Fetch all papers for a given author and topic
+ */
+public List<Paper> getPapersByAuthorIdAndTopic(String authorId, String topicName) {
+    System.out.println("Service: Fetching papers for author ID: " + authorId +
+                       " and topic: " + topicName);
+    return professorRepository.findPapersByAuthorIdAndTopic(authorId, topicName);
+}
+
+    
+
 
 }

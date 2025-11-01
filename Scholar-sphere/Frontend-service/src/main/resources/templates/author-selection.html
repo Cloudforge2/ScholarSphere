@@ -1,36 +1,3 @@
-<!-- <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    
-    <title>Select Author</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 30px; }
-        .author-card {
-            border: 1px solid #ddd;
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 6px;
-        }
-        .author-card:hover { background-color: #f9f9f9; }
-        a {
-            text-decoration: none;
-            color: #007bff;
-        }
-        a:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-<h2 th:text="'Authors matching: ' + ${searchName}"></h2>
-
-<div th:each="author : ${authors}" class="author-card">
-    <p><strong th:text="${author.displayName}"></strong></p>
-    <p><a th:href="@{'/professor-graph?id=' + ${author.id}}">View Graph</a></p>
-</div>
-
-<a href="/main">← Back to Search</a>
-</body>
-</html> -->
-
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -137,11 +104,19 @@
 
         <div th:each="author : ${authors}" class="author-card">
             <p><strong th:text="${author.displayName}"></strong></p>
-            <p><a th:href="@{'/professor-graph?id=' + ${author.id}}">View Graph</a></p>
+            <p>
+                <a th:href="@{'/professor-graph?id=' + ${author.id}}"
+                   style="margin-right:15px; color:#2563eb;">📄 View Papers Graph</a>
+
+                <a th:href="@{'/coauthor-graph?id=' + ${author.id}}"
+                   style="color:#9333ea;">👥 View Coauthors Graph</a>
+
+                <a th:href="@{'/topic-graph?id=' + ${author.id} + '&name=' + ${author.displayName}}"
+                   style="color:#0d4f4c;">🌐 View Research Domain Graph</a>
+            </p>
         </div>
 
         <a href="/main" class="back-link">← Back to Search</a>
     </div>
 </body>
 </html>
-

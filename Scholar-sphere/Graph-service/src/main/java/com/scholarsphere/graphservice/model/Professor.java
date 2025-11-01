@@ -14,7 +14,7 @@ public class Professor {
     @Id
     private String id;
 
-    private String displayName;
+    private String displayName;;
 
     // A professor can author many papers
     @Relationship(type = "AUTHORED", direction = Relationship.Direction.OUTGOING)

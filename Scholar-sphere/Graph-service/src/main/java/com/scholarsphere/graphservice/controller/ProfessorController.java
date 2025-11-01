@@ -1,5 +1,6 @@
 package com.scholarsphere.graphservice.controller;
 
+import com.scholarsphere.graphservice.model.Paper;
 import com.scholarsphere.graphservice.model.Professor;
 import com.scholarsphere.graphservice.services.ProfessorService;
 import com.scholarsphere.graphservice.repository.ProfessorRepository;
@@ -58,6 +59,53 @@ public class ProfessorController {
         boolean exists = professorService.checkIfAuthorExists(id);
         return ResponseEntity.ok(exists);
     }
+
+    @GetMapping("/paper/authors")
+    public ResponseEntity<List<Professor>> getAuthorsByPaperId(@RequestParam String id) {
+        String decodedId = URLDecoder.decode(id, StandardCharsets.UTF_8);
+        System.out.println("Fetching authors for paper with decoded ID: " + decodedId);
+        List<Professor> authors = professorService.getAuthorsByPaperId(decodedId);
+        return authors.isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(authors);
+    }
+
+
+    /**
+     * 🆕 2️⃣ Get all coauthors of a given author
+     */
+    @GetMapping("/coauthors")
+    public ResponseEntity<List<Professor>> getCoauthorsByAuthorId(@RequestParam String id) {
+        String decodedId = URLDecoder.decode(id, StandardCharsets.UTF_8);
+        List<Professor> coauthors = professorService.getCoauthorsByAuthorId(decodedId);
+        if (coauthors.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(coauthors);
+    }
+
+// 🧠 Get all topics for an author
+@GetMapping("/topics")
+public ResponseEntity<List<String>> getTopicsByAuthorId(@RequestParam String id) {
+    String decodedId = URLDecoder.decode(id, StandardCharsets.UTF_8);
+    System.out.println("controller : Fetching topics for author ID: " + decodedId);
+
+    List<String> topics = professorService.getTopicsByAuthorId(decodedId);
+    return ResponseEntity.ok(topics);
+}
+
+// 📄 Get all papers for a given author and topic
+@GetMapping("/papers/by-topic")
+public ResponseEntity<List<Paper>> getPapersByAuthorIdAndTopic(
+        @RequestParam String id,
+        @RequestParam String topicName) {
+    String decodedId = URLDecoder.decode(id, StandardCharsets.UTF_8);
+    System.out.println("controller : Fetching papers for author ID: " + decodedId + " and topic: " + topicName);
+
+    List<Paper> papers = professorService.getPapersByAuthorIdAndTopic(decodedId, topicName);
+    return ResponseEntity.ok(papers);
+}
+
+
+
     
 
 
