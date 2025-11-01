@@ -90,7 +90,7 @@ async def get_professor_summary_by_id(
             
             for paper, summary in zip(enriched_papers, individual_summaries):
                 if summary and "Not enough content" not in summary:
-                    background_tasks.add_task(save_paper_summary_to_neo4j, driver, paper, summary)
+                    background_tasks.add_task(save_paper_cache_to_neo4j, driver, paper, summary)
             
             # Generate the main author summary
             author_summary = await core.generate_author_summary(session, author_info, enriched_papers)
