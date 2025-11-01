@@ -161,7 +161,18 @@ async def fetch_paper_by_id(session: aiohttp.ClientSession, paper_id: str) -> Op
     url = f"https://api.openalex.org/works/{paper_id}"
     params = {"mailto": MAILTO_EMAIL}
     return await _fetch_json(session, url, params)
+async def fetch_author_by_id(session: aiohttp.ClientSession, id: str) -> Optional[Dict]:
+    """
+    Fetches a single author's full details from OpenAlex using their ID.
+    """
+    if not id.startswith("https://openalex.org/"):
+         url = f"https://api.openalex.org/{id}"
+    else:
+         # Handle cases where the full URL might be passed
+         url = id
 
+    params = {"mailto": MAILTO_EMAIL}
+    return await _fetch_json(session, f"https://api.openalex.org/{url}", params)
 # --- Core Logic: Enrichment and Summarization ---
 def process_paper_data(paper_data: Dict) -> Dict:
     abstract = ""

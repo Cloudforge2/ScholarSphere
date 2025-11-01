@@ -174,9 +174,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const nodeId = params.nodes[0];
                 const node = data.nodes.get(nodeId);
                 if (node.type === "prof") {
-                    window.location.href = '/professor-summary?name=' + encodeURIComponent(node.label);
+                    window.location.href = '/professor-summary?id=' + node.id;
                 } else if (node.type === "paper") {
-                    window.location.href = '/paper-summary?id=' + encodeURIComponent(nodeId) +
+                    window.location.href = '/paper-summary?id=' + (nodeId) +
                                            '&title=' + encodeURIComponent(node.title);
                 }
             }

@@ -10,3 +10,5 @@ uvicorn[standard]
 # The script has fallback logic, but these are needed for full functionality.
 PyPDF2
 pdfplumber
+neo4j 
+pydantic-settings

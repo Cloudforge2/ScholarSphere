@@ -24,8 +24,8 @@ public class ProfessorGraphController {
     private final RestTemplate restTemplate;
 
     // Updated gateway service base URL for "by-name" endpoint
-   
-    private static final String PROFESSOR_BY_NAME_URL = "http://summary-service:8085/professors/summary/by-name?name=";
+
+    private static final String PROFESSOR_BY_ID_URL = "http://summary-service:8085/professors/summary/by-id?id=";
     private static final String PAPER_BY_TITLE_URL = "http://summary-service:8085/papers/by-title?title=";
     private static final String FETCH_AUTHOR_BY_ID_URL = "http://scrappy:8083/api/fetch-author-by-id?id=";
     private static final String GRAPH_SERVICE_URL = "http://graph-service:8082/api/professors/";
@@ -159,32 +159,38 @@ public class ProfessorGraphController {
     
 
 @GetMapping("/professor-summary")
-public String professorSummary(@RequestParam String name, Model model) {
+public String professorSummary(@RequestParam String id, Model model) { // <-- CHANGED from "name" to "id"
     try {
-        String url = PROFESSOR_BY_NAME_URL + URLEncoder.encode(name, StandardCharsets.UTF_8);
+        // Use the professor ID to build the request URL
+        String url = PROFESSOR_BY_ID_URL + (id);
         System.out.println("DEBUG: Calling summary service URL: " + url);
 
+        // Fetch the summary data using the ID
+        // The response is expected to be a Map, which is fine
         Map<String, Object> profMap = restTemplate.getForObject(url, Map.class);
         System.out.println("DEBUG: Raw response from summary service: " + profMap);
 
         if (profMap == null || profMap.isEmpty()) {
-            throw new RuntimeException("No professor found for name: " + name);
+            throw new RuntimeException("No professor summary found for ID: " + id);
         }
 
-        // ✅ Map actual response fields
-        model.addAttribute("author", name);
+        // Map the response fields to the model attributes for Thymeleaf
+        // Use a default value for author name if not present in the response
+        model.addAttribute("author", profMap.getOrDefault("display_name", "Professor"));
         model.addAttribute("summary", profMap.getOrDefault("research_summary", "No summary available."));
         model.addAttribute("papers_analyzed_count", profMap.getOrDefault("papers_analyzed_count", "N/A"));
         model.addAttribute("papers_sample", profMap.getOrDefault("papers_sample", Collections.emptyList()));
 
     } catch (Exception e) {
-        System.err.println("ERROR: Could not fetch data for " + name + ": " + e.getMessage());
+        System.err.println("ERROR: Could not fetch summary for professor ID " + id + ": " + e.getMessage());
         e.printStackTrace();
 
-        model.addAttribute("error", "Could not fetch data for " + name + ": " + e.getMessage());
-        model.addAttribute("author", null);
+        // Populate the model with error information for the user
+        model.addAttribute("error", "Could not fetch summary for professor with ID: " + id);
+        model.addAttribute("author", "Unknown Professor");
     }
 
+    // Return the name of the Thymeleaf HTML template
     return "professor-summary";
 }
 
@@ -306,7 +312,7 @@ public String professorSummary(@RequestParam String name, Model model) {
                 if (paperId != null) {
                     // ✅ Call /paper/by-id
                     summaryUrl = "http://summary-service:8085/paper/by-id?paper_id=" +
-                            URLEncoder.encode(paperId, StandardCharsets.UTF_8);
+                            paperId;
                 } else {
                     // ✅ Fallback: call /paper/by-title
                     summaryUrl = "http://summary-service:8085/paper/by-title?title=" +
