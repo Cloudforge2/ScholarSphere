@@ -209,8 +209,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!node) return;
 
             if (node.type === "prof") {
-                const encodedName = encodeURIComponent(node.label);
-                window.location.href = `/professor-summary?name=${encodedName}`;
+                window.location.href = "/professor-summary?id=" + node.id;
             } 
             else if (node.type === "paper") {
                 const encodedId = encodeURIComponent(node.id);

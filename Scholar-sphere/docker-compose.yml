@@ -99,6 +99,9 @@ services:
     build:
       context: ./Summary-service 
     container_name: summary-service
+    depends_on:
+      neo4j:
+        condition: service_healthy
     environment:
       GROQ_API_KEY: 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
       NEO4J_URI: bolt://neo4j-scrappy:7687

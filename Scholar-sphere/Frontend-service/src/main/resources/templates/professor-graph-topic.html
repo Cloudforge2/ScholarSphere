@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (params.nodes.length > 0) {
         const nodeId = params.nodes[0];
         if (nodeId === profNode.data.id) {
-          window.location.href = '/professor-summary?name=' + encodeURIComponent(profNode.data.label);
+          window.location.href = '/professor-summary?id=' + (profNode.data.id);
         } else {
           const topicName = nodeId.replaceAll('_', ' ');
           const authorId = profNode.data.id;

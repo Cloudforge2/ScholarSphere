@@ -123,6 +123,7 @@
         id: n.data.id,
         label: n.data.label,
         shape: "ellipse",
+        type: n.data.type,
         size: n.data.type === "prof" ? 45 : 30,
         color: n.data.type === "prof" 
           ? { background: "#2563eb", border: "#1d4ed8" }
@@ -176,16 +177,23 @@
       network = new vis.Network(container, data, options);
 
       // Click event navigation
-      network.on("click", function(params) {
+       network.on("click", function(params) {
         if (params.nodes.length > 0) {
           const nodeId = params.nodes[0];
-          const node = visNodes.find(n => n.id === nodeId);
+          const node = data.nodes.get(nodeId); // Use data.nodes.get() for vis.DataSet
+
           if (node) {
-            window.location.href = "/professor-summary?name=" + encodeURIComponent(node.label);
+            // Redirect based on the node's type
+            if (node.type === "prof") {
+                // Action for the main professor
+                window.location.href = "/professor-summary?id=" + node.id;
+            } else if (node.type === "coauthor") {
+                // Action for a coauthor (assuming they are also professors)
+                window.location.href = "/coauthor-graph?id=" + node.id;
+            }
           }
         }
       });
-
       // Update buttons
       document.getElementById("prevBtn").disabled = page === 0;
       document.getElementById("nextBtn").disabled = page >= totalPages - 1;

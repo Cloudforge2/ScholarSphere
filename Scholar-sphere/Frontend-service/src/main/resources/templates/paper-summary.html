@@ -185,7 +185,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const nodeId = params.nodes[0];
       const node = data.nodes.get(nodeId);
       if (node.type === "author") {
-        window.location.href = '/professor-summary?name=' + encodeURIComponent(node.label);
+        window.location.href = '/professor-summary?id=' + node.id;
       }
     }
   });
