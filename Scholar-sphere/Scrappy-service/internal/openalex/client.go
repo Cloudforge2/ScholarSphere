@@ -32,13 +32,15 @@ func NewClient() *Client {
 // This is an example of fetching a SINGLE entity.
 func (c *Client) FetchAuthorById(authorID string) (domain.Author, error) {
 	// Example URL: https://api.openalex.org/authors/A12345?mailto=...
-	url := fmt.Sprintf("%s/authors/%s", openAlexAPIBaseURL, authorID)
+	url := fmt.Sprintf("%s/authors/%s?data-version=1", openAlexAPIBaseURL, authorID)
 
 	var author domain.Author
 	err := c.fetchAndDecode(url, &author)
 	if err != nil {
 		return domain.Author{}, err
 	}
+	fmt.Println("url:", url)
+	fmt.Println("author topics:", len(author.Topics))
 
 	return author, nil
 }
