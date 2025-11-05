@@ -165,6 +165,7 @@ def generate_with_groq(prompt: str, model: str = None, max_tokens: int = 1024, t
     Returns the generated text, or raises an exception on HTTP/errors.
     """
     api_key = os.environ.get("GROQ_API_KEY") or GROQ_API_KEY
+    print(len(prompt))
     if not api_key:
         # Attempt to load interactively or from well-known files
         api_key = get_groq_api_key_interactive()
@@ -197,6 +198,7 @@ def generate_with_groq(prompt: str, model: str = None, max_tokens: int = 1024, t
                 if attempt < max_retries - 1:
                     wait_time = (2 ** attempt) * 2  # 2, 4, 8 seconds
                     print(f"   ⏳ Rate limited. Retrying in {wait_time} seconds... (attempt {attempt + 1}/{max_retries})")
+                    print(e)
                     time.sleep(wait_time)
                     continue
             raise
@@ -367,6 +369,72 @@ def fetch_author_candidates(author_name: str, max_results: int = 10):
     authors = r.json().get("results", [])
     return authors
 
+def fetch_author_by_id(author_id: str) -> Optional[Dict]:
+    """
+    Fetches a single author's full details from OpenAlex using their ID.
+    Follows the synchronous `requests` pattern of other functions in this file.
+    """
+    # Sanitize the ID to handle both "A50..." and full URLs
+    if "openalex.org/" in author_id:
+        author_id = author_id.split('/')[-1]
+    
+    # Construct the direct URL for the specific author
+    url = f"https://api.openalex.org/authors/{author_id}"
+    
+    try:
+        r = requests.get(url)
+        # Raises an HTTPError for bad responses (4xx or 5xx)
+        r.raise_for_status()
+        
+        # If successful, the JSON body is the author object itself
+        return r.json()
+        
+    except requests.exceptions.HTTPError as e:
+        # Gracefully handle the case where the author is not found (404)
+        if e.response.status_code == 404:
+            print(f"⚠️  Author with ID '{author_id}' not found.")
+        else:
+            print(f"⚠️  HTTP error fetching author ID '{author_id}': {e}")
+        return None
+    except requests.exceptions.RequestException as e:
+        # Handle other network-related errors (e.g., connection timeout)
+        print(f"⚠️  Network request failed for author ID '{author_id}': {e}")
+        return None
+    
+
+
+def fetch_paper_by_id(paper_id: str) -> Optional[Dict]:
+    """
+    Fetches a single paper's full details from OpenAlex using its ID.
+    Follows the synchronous `requests` pattern of other functions in this file.
+    """
+    # Sanitize the ID to handle both "W2755..." and full URLs
+    if "openalex.org/" in paper_id:
+        paper_id = paper_id.split('/')[-1]
+
+    # Construct the direct URL for the specific work
+    url = f"https://api.openalex.org/works/{paper_id}"
+
+    try:
+        r = requests.get(url)
+        # Raises an HTTPError for bad responses (4xx or 5xx)
+        r.raise_for_status()
+
+        # If successful, the JSON body is the paper object itself
+        return r.json()
+
+    except requests.exceptions.HTTPError as e:
+        # Gracefully handle the case where the paper is not found (404)
+        if e.response.status_code == 404:
+            print(f"⚠️  Paper with ID '{paper_id}' not found.")
+        else:
+            print(f"⚠️  HTTP error fetching paper ID '{paper_id}': {e}")
+        return None
+    except requests.exceptions.RequestException as e:
+        # Handle other network-related errors (e.g., connection timeout)
+        print(f"⚠️  Network request failed for paper ID '{paper_id}': {e}")
+        return None
+    
 
 def fetch_author_by_orcid(orcid: str) -> Optional[dict]:
     """Fetch an OpenAlex author by ORCID identifier."""
@@ -869,6 +937,7 @@ Content (truncated for prompt):
 
 Write the summary now, using the labeled sections above. Keep it technical and precise.
 """
+        print("inside generate paper summary")
 
         try:
             summary = generate_with_groq(prompt, model=GROQ_MODEL, max_tokens=max_tokens, temperature=0.2)
@@ -1159,6 +1228,8 @@ Write a detailed, insightful summary of {author_name}'s research contributions:"
 
     try:
         print(f"🤖 Generating summary with {GROQ_MODEL} via GroqCloud...")
+       
+        
         try:
             summary = generate_with_groq(prompt, model=GROQ_MODEL, max_tokens=1024, temperature=0.2)
         except requests.exceptions.HTTPError as e:
@@ -1191,6 +1262,16 @@ Write a detailed, insightful summary of {author_name}'s research contributions:"
 # Main Function
 # -----------------------------
 def main():
+    groq_key = get_groq_api_key_interactive() 
+    if groq_key:
+        # For security, it's better to print a masked version of the key
+        masked_key = f"{groq_key[:4]}...{groq_key[-4:]}"
+        print(f"✅ DEBUG: GROQ API Key was found and loaded. Key: {groq_key}")
+        # If you absolutely MUST see the full key, uncomment the line below
+        # print(f"!!! INSECURE DEBUG: Full key is: {groq_key} !!!") 
+    else:
+        print("❌ DEBUG: GROQ API Key was NOT found.")
+    print("--- [END DEBUGGING] ---\n")
     print("🔍 Enhanced Author Profile System with Multiple Data Sources and Deduplication")
     print("Data sources: OpenAlex, arXiv, Semantic Scholar, Unpaywall, Crossref")
     print("Features: Automatic duplicate removal from multiple sources")
@@ -1368,7 +1449,7 @@ def main():
 
     # Sort all papers by citation count (descending)
     all_sorted = sorted(papers, key=lambda x: x.get("cited_by_count", 0), reverse=True)
-
+    print(all_sorted)
     # Paginate output: show 10 papers at a time
     page_size = 10
     total = len(all_sorted)

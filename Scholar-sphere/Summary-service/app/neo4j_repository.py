@@ -111,7 +111,8 @@ async def save_paper_cache_to_neo4j(driver: AsyncDriver, paper_info: Dict[str, A
     """
     Saves the COMPLETE paper response payload (info and summary) to Neo4j.
     """
-    paper_id = paper_info.get("id")
+    # print(paper_info)
+    paper_id = paper_info.get("openalex_id")
     title = paper_info.get("title")
 
     if not paper_id or not title:
