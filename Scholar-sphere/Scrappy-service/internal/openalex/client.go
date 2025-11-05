@@ -161,7 +161,7 @@ func (c *Client) FetchAllWorksByAuthorID(authorID string) ([]domain.Work, error)
 	perPage := 200
 
 	for {
-		url := fmt.Sprintf("%s/works?filter=author.id:%s&per-page=%d&cursor=%s", openAlexAPIBaseURL, authorID, perPage, url.QueryEscape(cursor))
+		url := fmt.Sprintf("%s/works?filter=author.id:%s&per-page=%d&data-version=1&cursor=%s", openAlexAPIBaseURL, authorID, perPage, url.QueryEscape(cursor))
 
 		var resp struct {
 			Results []domain.Work `json:"results"`
