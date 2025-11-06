@@ -119,7 +119,7 @@ public boolean shouldIngest(String authorId) {
             LocalDateTime now = LocalDateTime.now();
             long minutes = ChronoUnit.MINUTES.between(lastFetched, now);
             long days = ChronoUnit.DAYS.between(lastFetched, now);
-            if (minutes > 1) {
+            if (days > 15 ) {
                 System.out.println("🟡 Author data is " + days + " days old. Should re-ingest.");
                 return true;
             }
