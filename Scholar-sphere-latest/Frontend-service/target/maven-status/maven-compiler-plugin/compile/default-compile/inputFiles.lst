@@ -1,0 +1,13 @@
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/config/WebSocketConfig.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/controller/ProfessorGraphController.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/config/SecurityConfig.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/config/CustomUserDetailsService.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/model/Professor.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/model/User.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/controller/MainController.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/MainApplication.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/controller/ChatWebSocketController.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/controller/AuthController.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/repository/UserRepository.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/model/Paper.java
+/home/annu1606/Documents/scholarsphere/Frontend-service/src/main/java/com/example/Scholarsphere/service/UserService.java

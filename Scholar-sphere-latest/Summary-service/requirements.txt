@@ -1,0 +1,14 @@
+# Core libraries for making HTTP requests
+requests
+aiohttp
+
+# Web framework for the API endpoint
+fastapi
+uvicorn[standard]
+
+# Optional, but highly recommended for PDF text extraction
+# The script has fallback logic, but these are needed for full functionality.
+PyPDF2
+pdfplumber
+neo4j 
+pydantic-settings
