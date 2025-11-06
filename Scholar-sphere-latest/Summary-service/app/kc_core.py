@@ -7,7 +7,7 @@ Features:
 - Removes duplicate content from multiple sources
 - Downloads and parses PDFs from multiple sources
 - Shows co-authors and their affiliations
-- Generates detailed summaries using advanced LLM
+- Generates detailed summaries using GroqCloud (primary), OpenAI GPT-4o-mini (fallback), and rule-based (final fallback)
 """
 
 import requests
@@ -15,7 +15,7 @@ import asyncio
 import aiohttp
 import re
 # Use GroqCloud (OpenAI-compatible) for LLM calls if GROQ_API_KEY is provided.
-# The script will fall back to rule-based summary if the Groq call fails or key is missing.
+# The script will fall back to rule-based summary if both Groq and OpenAI calls fail.
 from typing import List, Dict, Optional, Set
 from collections import Counter
 import xml.etree.ElementTree as ET
@@ -36,7 +36,8 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "llama3.3:70b")
 # Groq settings (use GROQ_API_KEY env var). Default Groq model id:
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", None)
-
+# OpenAI fallback model
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
 # -----------------------------
 # Helpers: sanitize text and manage GROQ API key
@@ -72,7 +73,7 @@ def trim_to_last_sentence(text: str) -> str:
     If no sentence-ending punctuation is found, return the original text.
     """
     if not text:
-        return text
+        return ""
     # Find last occurrence of sentence-ending punctuation
     last_dot = max(text.rfind('.'), text.rfind('?'), text.rfind('!'))
     if last_dot == -1 or last_dot < len(text) - 10:
@@ -165,7 +166,12 @@ def generate_with_groq(prompt: str, model: str = None, max_tokens: int = 1024, t
     Returns the generated text, or raises an exception on HTTP/errors.
     """
     api_key = os.environ.get("GROQ_API_KEY") or GROQ_API_KEY
-    print(len(prompt))
+    # print(prompt length only for debug
+    try:
+        print(f"[DEBUG] prompt length: {len(prompt)}")
+    except Exception:
+        pass
+
     if not api_key:
         # Attempt to load interactively or from well-known files
         api_key = get_groq_api_key_interactive()
@@ -237,6 +243,46 @@ def generate_with_groq(prompt: str, model: str = None, max_tokens: int = 1024, t
     return json.dumps(data)
 
 # -----------------------------
+# OpenAI fallback helper
+# -----------------------------
+def generate_with_openai(prompt: str, model: str = None, max_tokens: int = 1024, temperature: float = 0.3) -> str:
+    """Call OpenAI API (gpt-4o-mini by default) as a fallback if Groq fails."""
+    model = model or OPENAI_MODEL
+    try:
+        import openai
+        openai_api_key = os.environ.get("OPENAI_API_KEY")
+        if not openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY environment variable not set")
+        openai.api_key = openai_api_key
+
+        # Use ChatCompletion for broad compatibility
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        # Extract content robustly
+        choices = response.get("choices", [])
+        if choices:
+            first = choices[0]
+            msg = first.get("message") or first
+            if isinstance(msg, dict):
+                content = msg.get("content") or msg.get("text")
+                if content:
+                    return content.strip()
+            text = first.get("text")
+            if text:
+                return text.strip()
+        # fallback to response text
+        if isinstance(response.get("usage"), dict) or isinstance(response, dict):
+            # if nothing else, stringify
+            return json.dumps(response)
+    except Exception as e:
+        print(f"⚠️  OpenAI call failed: {e}")
+    return ""
+
+# -----------------------------
 # PDF Processing (Pure Python)
 # -----------------------------
 def extract_text_from_pdf(pdf_data: bytes) -> Optional[str]:
@@ -249,14 +295,15 @@ def extract_text_from_pdf(pdf_data: bytes) -> Optional[str]:
             reader = PyPDF2.PdfReader(pdf_stream)
             text = ""
             for page in reader.pages:
-                text += page.extract_text() + "\n"
+                page_text = page.extract_text() or ""
+                text += page_text + "\n"
             if text.strip():
                 return text
         except ImportError:
             pass
         except Exception as e:
             print(f"⚠️  PyPDF2 extraction failed: {e}")
-        
+
         # Try using pdfplumber
         try:
             import pdfplumber
@@ -264,14 +311,15 @@ def extract_text_from_pdf(pdf_data: bytes) -> Optional[str]:
             with pdfplumber.open(pdf_stream) as pdf:
                 text = ""
                 for page in pdf.pages:
-                    text += page.extract_text() + "\n"
+                    page_text = page.extract_text() or ""
+                    text += page_text + "\n"
                 if text.strip():
                     return text
         except ImportError:
             pass
         except Exception as e:
             print(f"⚠️  pdfplumber extraction failed: {e}")
-        
+
         return None
     except Exception as e:
         print(f"⚠️  Error extracting PDF text: {e}")
@@ -297,22 +345,22 @@ def is_duplicate(text1: str, text2: str, threshold: float = 0.9) -> bool:
     """Check if two texts are duplicates using similarity threshold."""
     if not text1 or not text2:
         return False
-    
+
     # Quick hash check first
     if get_text_hash(text1) == get_text_hash(text2):
         return True
-    
+
     # For short texts, check exact match after normalization
     if len(text1) < 200 and len(text2) < 200:
         return normalize_text(text1) == normalize_text(text2)
-    
+
     # For longer texts, check if one is contained in the other
     norm1 = normalize_text(text1)
     norm2 = normalize_text(text2)
-    
+
     if norm1 in norm2 or norm2 in norm1:
         return True
-    
+
     # Check similarity ratio for longer texts
     if len(norm1) > 100 and len(norm2) > 100:
         # Simple similarity check
@@ -321,41 +369,41 @@ def is_duplicate(text1: str, text2: str, threshold: float = 0.9) -> bool:
         if total_words:
             similarity = len(common_words) / len(total_words)
             return similarity > threshold
-    
+
     return False
 
 def deduplicate_content(content_list: List[tuple]) -> List[tuple]:
     """Remove duplicate content from a list of (content, source) tuples."""
     if not content_list:
         return []
-    
+
     unique_content = []
     seen_hashes: Set[str] = []
-    
+
     for content, source in content_list:
         if not content or not content.strip():
             continue
-        
+
         content_hash = get_text_hash(content)
-        
+
         # Check if this content is a duplicate of anything we've seen
         is_dup = False
         for seen_hash in seen_hashes:
             if content_hash == seen_hash:
                 is_dup = True
                 break
-        
+
         # Also check against existing unique content for near-duplicates
         if not is_dup:
             for existing_content, _ in unique_content:
                 if is_duplicate(content, existing_content):
                     is_dup = True
                     break
-        
+
         if not is_dup:
             unique_content.append((content, source))
             seen_hashes.append(content_hash)
-    
+
     return unique_content
 
 # -----------------------------
@@ -363,7 +411,7 @@ def deduplicate_content(content_list: List[tuple]) -> List[tuple]:
 # -----------------------------
 def fetch_author_candidates(author_name: str, max_results: int = 10):
     """Fetch multiple author candidates from OpenAlex."""
-    url = f"https://api.openalex.org/authors?search={author_name}&per-page={max_results}"
+    url = f"https://api.openalex.org/authors?search={quote(author_name)}&per-page={max_results}"
     r = requests.get(url)
     r.raise_for_status()
     authors = r.json().get("results", [])
@@ -377,18 +425,18 @@ def fetch_author_by_id(author_id: str) -> Optional[Dict]:
     # Sanitize the ID to handle both "A50..." and full URLs
     if "openalex.org/" in author_id:
         author_id = author_id.split('/')[-1]
-    
+
     # Construct the direct URL for the specific author
     url = f"https://api.openalex.org/authors/{author_id}"
-    
+
     try:
         r = requests.get(url)
         # Raises an HTTPError for bad responses (4xx or 5xx)
         r.raise_for_status()
-        
+
         # If successful, the JSON body is the author object itself
         return r.json()
-        
+
     except requests.exceptions.HTTPError as e:
         # Gracefully handle the case where the author is not found (404)
         if e.response.status_code == 404:
@@ -400,7 +448,7 @@ def fetch_author_by_id(author_id: str) -> Optional[Dict]:
         # Handle other network-related errors (e.g., connection timeout)
         print(f"⚠️  Network request failed for author ID '{author_id}': {e}")
         return None
-    
+
 
 
 def fetch_paper_by_id(paper_id: str) -> Optional[Dict]:
@@ -434,7 +482,7 @@ def fetch_paper_by_id(paper_id: str) -> Optional[Dict]:
         # Handle other network-related errors (e.g., connection timeout)
         print(f"⚠️  Network request failed for paper ID '{paper_id}': {e}")
         return None
-    
+
 
 def fetch_author_by_orcid(orcid: str) -> Optional[dict]:
     """Fetch an OpenAlex author by ORCID identifier."""
@@ -458,43 +506,52 @@ def display_author_candidates(authors: List[dict]) -> dict:
     print("\n" + "=" * 80)
     print("🔍 FOUND MULTIPLE AUTHORS - Please select one:")
     print("=" * 80)
-    
+
     for i, author in enumerate(authors, 1):
         display_name = author.get("display_name", "Unknown")
-        
+
         # Get ORCID
         orcid = author.get("orcid", "N/A")
         if orcid and orcid.startswith("https://orcid.org/"):
             orcid = orcid.replace("https://orcid.org/", "")
-        
+
         # Get affiliation
         affiliation = "N/A"
         last_institution = author.get("last_known_institution", {})
         if last_institution:
             affiliation = last_institution.get("display_name", "N/A")
-        
+
         if affiliation == "N/A":
             institutions = author.get("last_known_institutions", [])
             if institutions:
                 affiliation = institutions[0].get("display_name", "N/A")
-        
+
         works_count = author.get("works_count", 0)
         cited_by_count = author.get("cited_by_count", 0)
         h_index = author.get("summary_stats", {}).get("h_index", 0)
-        
+
         print(f"\n{i}. {display_name}")
         print(f"   🆔 ORCID: {orcid}")
         print(f"   📍 Affiliation: {affiliation}")
         print(f"   📊 Papers: {works_count} | 📈 Citations: {cited_by_count} | 🎯 h-index: {h_index}")
-    
+
     print("\n" + "=" * 80)
-    
+
     while True:
         try:
             choice = input(f"\nSelect author (1-{len(authors)}) or 'q' to quit: ").strip()
-            if choice.lower() == 'q':
-                return None
-            
+        except EOFError:
+            # Non-interactive environment: choose the first candidate by default
+            print("\n⚠️  Non-interactive environment detected — selecting the first author by default.")
+            return authors[0]
+        except Exception:
+            print("❌ Invalid input. Please enter a number or 'q' to quit")
+            continue
+
+        if choice.lower() == 'q':
+            return None
+
+        try:
             choice_num = int(choice)
             if 1 <= choice_num <= len(authors):
                 return authors[choice_num - 1]
@@ -506,27 +563,27 @@ def display_author_candidates(authors: List[dict]) -> dict:
 def extract_coauthors(authorships: List[dict], main_author_id: str) -> List[Dict]:
     """Extract co-authors with their affiliations."""
     coauthors = []
-    
+
     for authorship in authorships:
         author_info = authorship.get("author", {})
         author_id = author_info.get("id", "")
-        
+
         # Skip the main author
         if author_id == main_author_id:
             continue
-        
+
         # Get author name
         author_name = author_info.get("display_name", "Unknown")
-        
+
         # Get institutions
         institutions = authorship.get("institutions", [])
         affiliations = [inst.get("display_name", "Unknown") for inst in institutions]
-        
+
         coauthors.append({
             "name": author_name,
             "affiliations": affiliations if affiliations else ["Unknown"]
         })
-    
+
     return coauthors
 
 def fetch_all_openalex_papers(author_id: str, batch_size: int = 100, max_papers: Optional[int] = None):
@@ -534,22 +591,22 @@ def fetch_all_openalex_papers(author_id: str, batch_size: int = 100, max_papers:
     all_papers = []
     cursor = "*"
     has_more = True
-    
+
     print(f"📚 Fetching all papers for author (this may take a while for prolific authors)...")
-    
+
     while has_more:
         url = f"https://api.openalex.org/works?filter=authorships.author.id:{author_id}&sort=cited_by_count:desc&per-page={batch_size}&cursor={cursor}"
-        
+
         try:
             r = requests.get(url)
             r.raise_for_status()
             data = r.json()
-            
+
             papers_data = data.get("results", [])
             if not papers_data:
                 has_more = False
                 break
-            
+
             for item in papers_data:
                 # Decode inverted abstract
                 abstract = ""
@@ -564,7 +621,7 @@ def fetch_all_openalex_papers(author_id: str, batch_size: int = 100, max_papers:
                         abstract = " ".join(words)
                     except:
                         abstract = ""
-                
+
                 # Get venue
                 primary_location = item.get("primary_location", {})
                 venue = ""
@@ -572,17 +629,17 @@ def fetch_all_openalex_papers(author_id: str, batch_size: int = 100, max_papers:
                     source = primary_location.get("source", {})
                     if source:
                         venue = source.get("display_name", "")
-                
+
                 if not venue:
                     venue = item.get("host_venue", {}).get("display_name", "")
-                
+
                 # Get title
                 title = item.get("display_name") or item.get("title", "Untitled")
-                
+
                 # Extract co-authors
                 authorships = item.get("authorships", [])
                 coauthors = extract_coauthors(authorships, author_id)
-                
+
                 # Extract arXiv ID if available
                 arxiv_id = None
                 ids = item.get("ids", {})
@@ -592,12 +649,12 @@ def fetch_all_openalex_papers(author_id: str, batch_size: int = 100, max_papers:
                         match = re.search(r'arxiv\.org/abs/(\d+\.\d+)', arxiv_url)
                         if match:
                             arxiv_id = match.group(1)
-                
+
                 # Get DOI
                 doi = item.get("doi") or ""
                 if doi:
                     doi = doi.replace("https://doi.org/", "")
-                
+
                 all_papers.append({
                     "title": title,
                     "year": item.get("publication_year", "N/A"),
@@ -609,24 +666,24 @@ def fetch_all_openalex_papers(author_id: str, batch_size: int = 100, max_papers:
                     "doi": doi,
                     "openalex_id": item.get("id", "")
                 })
-            
+
             # Check if we have more results
             meta = data.get("meta", {})
             cursor = meta.get("next_cursor", "")
             has_more = bool(cursor)
-            
+
             # Apply max_papers limit if specified
             if max_papers and len(all_papers) >= max_papers:
                 all_papers = all_papers[:max_papers]
                 has_more = False
-            
+
             # Progress indicator
             print(f"   Fetched {len(all_papers)} papers so far...")
-            
+
         except Exception as e:
             print(f"⚠️  Error fetching papers: {e}")
             break
-    
+
     print(f"✅ Total papers fetched: {len(all_papers)}")
     return all_papers
 
@@ -637,15 +694,15 @@ async def fetch_unpaywall(session, doi: str) -> Optional[str]:
     """Fetch open access version of paper via Unpaywall."""
     if not doi:
         return None
-    
+
     try:
-        url = f"https://api.unpaywall.org/v2/{doi}?email=research@example.com"
+        url = f"https://api.unpaywall.org/v2/{quote(doi)}?email=research@example.com"
         async with session.get(url) as resp:
             if resp.status != 200:
                 return None
-            
+
             data = await resp.json()
-            
+
             # Check if open access version is available
             if data.get("oa_status") in ["green", "gold", "hybrid"]:
                 oa_location = data.get("best_oa_location", {})
@@ -661,7 +718,7 @@ async def fetch_unpaywall(session, doi: str) -> Optional[str]:
                                     return text
     except Exception as e:
         print(f"⚠️  Unpaywall fetch failed for DOI {doi}: {e}")
-    
+
     return None
 
 # -----------------------------
@@ -671,26 +728,26 @@ async def fetch_crossref_data(session, doi: str) -> Dict:
     """Fetch additional metadata from Crossref."""
     if not doi:
         return {}
-    
+
     try:
-        url = f"https://api.crossref.org/works/{doi}"
+        url = f"https://api.crossref.org/works/{quote(doi)}"
         async with session.get(url) as resp:
             if resp.status != 200:
                 return {}
-            
+
             data = await resp.json()
             message = data.get("message", {})
-            
+
             # Safely extract fields with proper checks
             title_list = message.get("title", [])
             title = " ".join(title_list) if title_list else ""
-            
+
             container_title_list = message.get("container-title", [])
             container_title = container_title_list[0] if container_title_list else ""
-            
+
             date_parts = message.get("published-print", {}).get("date-parts", [[]])
             published = date_parts[0][0] if date_parts and date_parts[0] else ""
-            
+
             return {
                 "abstract": message.get("abstract", ""),
                 "title": title,
@@ -699,7 +756,7 @@ async def fetch_crossref_data(session, doi: str) -> Dict:
             }
     except Exception as e:
         print(f"⚠️  Crossref fetch failed for DOI {doi}: {e}")
-    
+
     return {}
 
 # -----------------------------
@@ -709,53 +766,53 @@ async def fetch_arxiv_pdf(session, arxiv_id: str) -> Optional[str]:
     """Download and extract text from arXiv PDF."""
     if not arxiv_id:
         return None
-    
+
     try:
         pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
         async with session.get(pdf_url) as resp:
             if resp.status != 200:
                 return None
-            
+
             pdf_data = await resp.read()
             text = extract_text_from_pdf(pdf_data)
             if text:
                 return text
-                
+
     except Exception as e:
         print(f"⚠️  arXiv PDF fetch failed for {arxiv_id}: {e}")
-    
+
     return None
 
 async def fetch_arxiv_fulltext(session, arxiv_id: str) -> Optional[str]:
     """Fetch full text from arXiv, trying PDF first then falling back to abstract."""
     if not arxiv_id:
         return None
-    
+
     # First try to get the PDF
     pdf_text = await fetch_arxiv_pdf(session, arxiv_id)
     if pdf_text:
         return pdf_text
-    
+
     # Fallback to abstract
     try:
-        url = f"http://export.arxiv.org/api/query?id_list={arxiv_id}"
+        url = f"http://export.arxiv.org/api/query?id_list={quote(arxiv_id)}"
         async with session.get(url) as resp:
             if resp.status != 200:
                 return None
-            
+
             xml_content = await resp.text()
             root = ET.fromstring(xml_content)
-            
+
             ns = {'atom': 'http://www.w3.org/2005/Atom'}
             entry = root.find('atom:entry', ns)
-            
+
             if entry is not None:
                 summary = entry.find('atom:summary', ns)
                 if summary is not None and summary.text:
                     return summary.text.strip()
     except Exception as e:
         print(f"⚠️  arXiv fetch failed for {arxiv_id}: {e}")
-    
+
     return None
 
 # -----------------------------
@@ -788,39 +845,39 @@ async def enrich_papers_with_content(papers: List[dict], max_concurrent: int = 5
     """Enrich papers with full text from multiple sources with deduplication."""
     async with aiohttp.ClientSession() as session:
         enriched_papers = []
-        
+
         for i in range(0, len(papers), max_concurrent):
             batch = papers[i:i+max_concurrent]
-            
+
             # Create tasks for all data sources
             tasks = []
-            
+
             for p in batch:
                 # arXiv
                 tasks.append(fetch_arxiv_fulltext(session, p.get("arxiv_id")))
-                
+
                 # Semantic Scholar
                 tasks.append(fetch_semantic_data(session, p["title"]))
-                
+
                 # Unpaywall (if DOI available)
                 tasks.append(fetch_unpaywall(session, p.get("doi")))
-                
+
                 # Crossref (if DOI available)
                 tasks.append(fetch_crossref_data(session, p.get("doi")))
-            
+
             # Execute all tasks
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # Process results for each paper
             for j, paper in enumerate(batch):
                 content_sources = []  # List of (content, source) tuples
-                
+
                 # arXiv result
                 arxiv_result = results[j*4]
                 if isinstance(arxiv_result, str) and arxiv_result:
                     source_type = "arXiv PDF" if len(arxiv_result) > 1000 else "arXiv Abstract"
                     content_sources.append((arxiv_result, source_type))
-                
+
                 # Semantic Scholar result
                 ss_result = results[j*4 + 1]
                 if isinstance(ss_result, dict):
@@ -830,45 +887,45 @@ async def enrich_papers_with_content(papers: List[dict], max_concurrent: int = 5
                         tldr_text = f"Summary: {ss_result['tldr']}"
                         content_sources.append((tldr_text, "Semantic Scholar TL;DR"))
                         paper["tldr"] = ss_result["tldr"]
-                
+
                 # Unpaywall result
                 unpaywall_result = results[j*4 + 2]
                 if isinstance(unpaywall_result, str) and unpaywall_result:
                     content_sources.append((unpaywall_result, "Unpaywall OA"))
-                
+
                 # Crossref result
                 crossref_result = results[j*4 + 3]
                 if isinstance(crossref_result, dict):
                     if crossref_result.get("abstract"):
                         content_sources.append((crossref_result["abstract"], "Crossref"))
-                
+
                 # Add OpenAlex abstract
                 if paper["abstract"]:
                     content_sources.append((paper["abstract"], "OpenAlex"))
-                
+
                 # Deduplicate content
                 unique_content = deduplicate_content(content_sources)
-                
+
                 # Combine unique content
                 combined_content = []
                 sources = []
                 for content, source in unique_content:
                     combined_content.append(content)
                     sources.append(source)
-                
+
                 paper["full_content"] = "\n\n".join(combined_content)
                 paper["has_fulltext"] = bool(combined_content)
                 paper["content_source"] = ", ".join(sources) if sources else "None"
                 paper["content_sources"] = sources  # Keep detailed source info
-                
+
                 enriched_papers.append(paper)
-            
+
             # Progress indicator
             print(f"   Processed {min(i+max_concurrent, len(papers))}/{len(papers)} papers...")
-            
+
             # Small delay to avoid rate limiting
             await asyncio.sleep(0.5)
-    
+
     return enriched_papers
 
 # -----------------------------
@@ -879,21 +936,21 @@ def rule_based_summary(author_name: str, papers: List[dict]) -> str:
     all_text = " ".join([p.get("full_content", "") for p in papers])
     words = re.findall(r"\b[a-zA-Z]{5,}\b", all_text.lower())
     counter = Counter(words)
-    
+
     stopwords = {"based", "using", "paper", "approach", "method", "system", "systems", 
                  "research", "study", "results", "proposed", "present", "provide"}
     keywords = [w for w, _ in counter.most_common(20) if w not in stopwords][:10]
-    
+
     summary = f"{author_name} has published {len(papers)} papers. "
     summary += f"Main research areas include: {', '.join(keywords)}. "
-    
+
     total_citations = sum(p.get("cited_by_count", 0) for p in papers)
     summary += f"These papers have received {total_citations} citations in total."
-    
+
     return summary
 
 # -----------------------------
-# LLM Summary Generation
+# LLM Summary Generation (with OpenAI fallback)
 # -----------------------------
 def generate_paper_summary(paper: dict, max_tokens: int = 800) -> str:
     """Generate a summary for an individual paper.
@@ -939,9 +996,25 @@ Write the summary now, using the labeled sections above. Keep it technical and p
 """
         print("inside generate paper summary")
 
+        # Try Groq first
+        summary = ""
         try:
+            print(f"🤖 Generating paper summary with Groq ({GROQ_MODEL})...")
             summary = generate_with_groq(prompt, model=GROQ_MODEL, max_tokens=max_tokens, temperature=0.2)
-            if summary and str(summary).strip():
+        except Exception as e:
+            print(f"⚠️  Groq call failed for paper summary: {e}")
+
+        # If Groq failed or returned empty, try OpenAI
+        if not summary or not str(summary).strip():
+            try:
+                print("💡 Trying OpenAI GPT-4o-mini as fallback for paper summary...")
+                summary = generate_with_openai(prompt, model=OPENAI_MODEL, max_tokens=max_tokens, temperature=0.3)
+            except Exception as e:
+                print(f"⚠️  OpenAI fallback failed for paper summary: {e}")
+                summary = ""
+
+        if summary and str(summary).strip():
+            try:
                 summary_text = str(summary).strip()
                 # Remove repeated 'Summary:' headings if present
                 summary_text = re.sub(r'^\s*Summary\s*:\s*', '', summary_text, flags=re.I)
@@ -950,10 +1023,8 @@ Write the summary now, using the labeled sections above. Keep it technical and p
                 # Trim trailing incomplete fragment to last full sentence
                 summary_text = trim_to_last_sentence(summary_text)
                 return summary_text
-            # fall through to fallback below if empty
-        except Exception:
-            # If LLM fails, fall back to showing an excerpt of the content
-            pass
+            except Exception:
+                pass
 
         # Fallback: return a truncated, sanitized excerpt of the full content
         excerpt = content[:600]
@@ -975,20 +1046,20 @@ def classify_paper_domains(papers: List[dict], batch_size: int = 10) -> List[dic
       calls and stay within rate limits. Each batch becomes one prompt to the
       LLM asking for a JSON array of domain assignments.
     - Before calling the LLM for a paper, we check a local cache stored in
-      `domain_cache.json` (loaded via `load_domain_cache()`). Cached results
-      are applied immediately and skip the LLM call for that paper.
+    `domain_cache.json` (loaded via `load_domain_cache()`). Cached results
+    are applied immediately and skip the LLM call for that paper.
     - Cache key selection: prefer `openalex_id` (most stable), else DOI, else
       MD5(title). This keeps the cache stable across runs and avoids
       reclassification of unchanged works.
     - For LLM input we use the paper `title` and a truncated `abstract` (first
       ~500 chars). This provides context while keeping prompts compact.
     - The prompt requests 1-2 domains and a confidence value per paper, and the
-      code expects strictly parseable JSON in response.
+    code expects strictly parseable JSON in response.
     - After a successful LLM response, the function assigns `domains` and
-      `domain_confidence` to each paper, updates the cache, and persists it to
-      disk after each batch (so progress isn't lost on interruption).
+    `domain_confidence` to each paper, updates the cache, and persists it to
+    disk after each batch (so progress isn't lost on interruption).
     - If the LLM call fails for a batch, the function falls back to assigning
-      the domain `"other"` to uncached items to keep processing moving.
+    the domain `"other"` to uncached items to keep processing moving.
 
     The block below is the original implementation with inline comments that
     explain each step; no behavior is changed.
@@ -1003,7 +1074,7 @@ def classify_paper_domains(papers: List[dict], batch_size: int = 10) -> List[dic
         "software engineering", "human-computer interaction", "robotics",
         "bioinformatics", "healthcare", "other"
     ]
-    
+
     # Informational log for the user (shows which cache file will be used)
     print(f"🏷️  Classifying {len(papers)} papers into domains using LLM... (cache: {DOMAIN_CACHE_FILE})")
 
@@ -1091,7 +1162,7 @@ Output JSON:"""
             pass
 
         print(f"   Classified {min(i+batch_size, len(papers))}/{len(papers)} papers...")
-        
+
         # Small delay between batches to be polite to the LLM provider and avoid rate limiting
         if i + batch_size < len(papers):
             time.sleep(1)
@@ -1109,7 +1180,7 @@ def compute_publication_stats(papers: List[dict], author_info: dict) -> dict:
         "top_collaborators": [],
         "collaboration_stats": {}
     }
-    
+
     # Yearly distribution
     years = [p.get("year") for p in papers if isinstance(p.get("year"), int)]
     if years:
@@ -1117,24 +1188,24 @@ def compute_publication_stats(papers: List[dict], author_info: dict) -> dict:
         max_year = max(years)
         stats["years_active"] = max_year - min_year + 1
         stats["publication_velocity"] = len(papers) / stats["years_active"] if stats["years_active"] > 0 else 0
-        
+
         for year in years:
             stats["papers_per_year"][year] = stats["papers_per_year"].get(year, 0) + 1
-    
+
     # Collaboration patterns
     coauthor_counts = Counter()
     for paper in papers:
         coauthors = paper.get("coauthors", [])
         for ca in coauthors:
             coauthor_counts[ca["name"]] += 1
-    
+
     # Top 10 collaborators
     stats["top_collaborators"] = coauthor_counts.most_common(10)
     stats["collaboration_stats"] = {
         "total_coauthors": len(coauthor_counts),
         "avg_coauthors_per_paper": sum(len(p.get("coauthors", [])) for p in papers) / len(papers) if papers else 0
     }
-    
+
     return stats
 
 
@@ -1172,7 +1243,7 @@ def generate_author_summary(author_name: str, author_info: dict, papers: List[di
         # Use a longer snippet from full content if available to give LLM enough
         # context for author-level synthesis (up to ~2000 chars per paper).
         content = p.get("full_content", "")[:2000]
-        
+
         # Format co-authors
         coauthors_str = ""
         if p.get("coauthors"):
@@ -1181,17 +1252,17 @@ def generate_author_summary(author_name: str, author_info: dict, papers: List[di
                 coauthors_str = f"Co-authors: {', '.join(coauthor_names)}, and {len(p['coauthors']) - 3} others"
             else:
                 coauthors_str = f"Co-authors: {', '.join(coauthor_names)}"
-        
+
         paper_info = f"{i}. {p['title']} ({p.get('year', 'N/A')})\n"
         paper_info += f"   Venue: {p.get('venue', 'N/A')} | Citations: {p.get('cited_by_count', 0)}\n"
         if coauthors_str:
             paper_info += f"   {coauthors_str}\n"
         paper_info += f"   Content: {content}"
-        
+
         papers_text.append(paper_info)
-    
+
     combined_text = "\n\n".join(papers_text)
-    
+
     # Get affiliation
     affiliation_name = "Unknown"
     last_institution = author_info.get("last_known_institution", {})
@@ -1201,11 +1272,11 @@ def generate_author_summary(author_name: str, author_info: dict, papers: List[di
         institutions = author_info.get("last_known_institutions", [])
         if institutions:
             affiliation_name = institutions[0].get("display_name", "Unknown")
-    
+
     total_works = author_info.get("works_count", 0)
     total_citations = author_info.get("cited_by_count", 0)
     h_index = author_info.get("summary_stats", {}).get("h_index", 0)
-    
+
     prompt = f"""You are an expert research analyst. Analyze the research profile of {author_name}, affiliated with {affiliation_name}.
 
 Author Metrics:
@@ -1226,37 +1297,27 @@ Top Papers:
 
 Write a detailed, insightful summary of {author_name}'s research contributions:"""
 
+    # Try Groq first, then OpenAI, then rule-based fallback
+    summary = ""
     try:
         print(f"🤖 Generating summary with {GROQ_MODEL} via GroqCloud...")
-       
-        
-        try:
-            summary = generate_with_groq(prompt, model=GROQ_MODEL, max_tokens=1024, temperature=0.2)
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                print(f"⚠️  Groq API rate limit exceeded after retries")
-                print(f"💡 Tip: Wait a minute and try again, or use a different API key")
-            else:
-                print(f"⚠️  Groq call failed: {e}")
-            print("📝 Using rule-based summary instead...\n")
-            return rule_based_summary(author_name, papers)
-        except Exception as e:
-            # If Groq call fails, fall back to rule-based
-            print(f"⚠️  Groq call failed: {e}")
-            print("📝 Using rule-based summary instead...\n")
-            return rule_based_summary(author_name, papers)
-
-        if not summary or not str(summary).strip():
-            print("⚠️  Empty summary from Groq")
-            print("📝 Using rule-based summary instead...\n")
-            return rule_based_summary(author_name, papers)
-
-        return str(summary).strip()
-
+        summary = generate_with_groq(prompt, model=GROQ_MODEL, max_tokens=1024, temperature=0.2)
     except Exception as e:
-        print(f"⚠️  LLM failed unexpectedly: {e}")
+        print(f"⚠️  Groq call failed for author summary: {e}")
+
+    if not summary or not str(summary).strip():
+        try:
+            print("💡 Trying OpenAI GPT-4o-mini as fallback for author summary...")
+            summary = generate_with_openai(prompt, model=OPENAI_MODEL, max_tokens=1024, temperature=0.3)
+        except Exception as e:
+            print(f"⚠️  OpenAI fallback failed for author summary: {e}")
+            summary = ""
+
+    if not summary or not str(summary).strip():
         print("📝 Using rule-based summary instead...\n")
         return rule_based_summary(author_name, papers)
+
+    return str(summary).strip()
 
 # -----------------------------
 # Main Function
@@ -1277,7 +1338,7 @@ def main():
     print("Features: Automatic duplicate removal from multiple sources")
     print("Note: For PDF extraction, install: pip install PyPDF2 pdfplumber")
     print()
-    
+
     # Safe input helper to allow non-interactive runs (returns default on EOF)
     def safe_input(prompt: str, default: str = "") -> str:
         try:
@@ -1287,32 +1348,32 @@ def main():
 
     # Step 0: Ask search method
     search_method = safe_input("Search by (1) Name or (2) ORCID? Enter 1 or 2: ", "1").strip()
-    
+
     author_info = None
-    
+
     if search_method == "2":
         # ORCID search
         orcid = safe_input("Enter ORCID (e.g., 0000-0002-1825-0097): ", "").strip()
         print(f"\n📋 Searching by ORCID: {orcid}")
         author_info = fetch_author_by_orcid(orcid)
-        
+
         if not author_info:
             print("❌ No author found with that ORCID")
             return
-        
+
         print(f"✅ Found: {author_info.get('display_name', 'Unknown')}")
     else:
         # Name search
         author_name = safe_input("Enter author name: ", "").strip()
-        
+
         # Step 1: Fetch author candidates
         print(f"\n📋 Searching for: {author_name}")
         authors = fetch_author_candidates(author_name)
-        
+
         if not authors:
             print("❌ No authors found in OpenAlex")
             return
-        
+
         # Step 2: Select author
         if len(authors) == 1:
             print(f"✅ Found: {authors[0].get('display_name', author_name)}")
@@ -1323,85 +1384,126 @@ def main():
                 print("\n👋 Exiting...")
                 return
             print(f"\n✅ Selected: {author_info.get('display_name', author_name)}")
-    
+
     author_id = author_info["id"]
     display_name = author_info.get("display_name", "Unknown")
+    # --- Merge multiple OpenAlex author profiles if same ORCID exists ---
+    orcid = author_info.get("orcid")
+    if orcid:
+        same_orcid_authors = [a for a in authors if a.get("orcid") == orcid and a.get("id") != author_id]
+        if same_orcid_authors:
+            print(f"\n🔗 Found {len(same_orcid_authors)} other OpenAlex profile(s) with the same ORCID — merging papers...")
+            # Include the selected author first
+            merged_author_ids = [author_id] + [a["id"] for a in same_orcid_authors]
+            all_papers = []
+            for idx, aid in enumerate(merged_author_ids, 1):
+                print(f"   Fetching papers from profile {idx}/{len(merged_author_ids)} ({aid})...")
+                try:
+                    papers_part = fetch_all_openalex_papers(aid)
+                    all_papers.extend(papers_part)
+                except Exception as e:
+                    print(f"⚠️  Failed to fetch papers for {aid}: {e}")
+
+            # Deduplicate by title or DOI
+            unique_papers = []
+            seen_keys = set()
+            for p in all_papers:
+                key = p.get("doi") or p.get("title", "").lower()
+                if key and key not in seen_keys:
+                    unique_papers.append(p)
+                    seen_keys.add(key)
+            papers = unique_papers
+            print(f"✅ Merged total of {len(papers)} unique papers from {len(merged_author_ids)} profiles.")
+        else:
+            # No other profiles with same ORCID
+            papers = fetch_all_openalex_papers(author_id)
+    else:
+        # No ORCID, just fetch selected author
+        papers = fetch_all_openalex_papers(author_id)
+
     # Note: works_count is from cached metadata and may differ slightly from actual fetch
     estimated_papers = author_info.get("works_count", 0)
-    
+
     # Ask if user wants all papers or a sample
-    fetch_all_input = safe_input(f"\n📚 Fetch all papers (~{estimated_papers} estimated)? This may take a while. (y/N): ", "n").strip()
+    # Default to fetching all papers when running non-interactively or when
+    # the user presses Enter. If the user explicitly answers 'n', they can
+    # supply a limit below.
+    fetch_all_input = safe_input(f"\n📚 Fetch all papers (~{estimated_papers} estimated)? This may take a while. (Y/n): ", "y").strip()
     try:
-        fetch_all = fetch_all_input.lower() == 'y'
+        fetch_all = fetch_all_input.lower() != 'n'
     except Exception:
-        fetch_all = False
-    
+        fetch_all = True
+
     # Step 3: Fetch papers with co-authors
     if fetch_all:
         papers = fetch_all_openalex_papers(author_id)
     else:
-        max_papers = safe_input("How many papers to fetch? (default 20): ", "20").strip()
+        # If the user opts out of fetching all, default to the estimated
+        # number of works (so there is no hard-coded "20") and allow the
+        # user to override with an integer.
+        default_limit = estimated_papers or 20
+        max_papers = safe_input(f"How many papers to fetch? (default {default_limit}): ", str(default_limit)).strip()
         try:
-            max_papers = int(max_papers) if max_papers else 20
-        except ValueError:
-            max_papers = 20
+            max_papers = int(max_papers) if max_papers else int(default_limit)
+        except Exception:
+            max_papers = int(default_limit)
 
         print(f"\n📚 Fetching top {max_papers} papers with co-author information...")
         papers = fetch_all_openalex_papers(author_id, max_papers=max_papers)
-    
+
     if not papers:
         print("❌ No papers found for this author")
         return
-    
+
     # Step 4: Enrich with full content from multiple sources
     print("🔄 Enriching with content from multiple sources (with deduplication)...")
     papers = asyncio.run(enrich_papers_with_content(papers))
-    
+
     # Count sources and duplicates removed
     source_counts = {}
     fulltext_count = 0
-    
+
     for p in papers:
         if p.get("has_fulltext"):
             fulltext_count += 1
-        
+
         # Count sources
         if p.get("content_sources"):
             for source in p["content_sources"]:
                 source_counts[source] = source_counts.get(source, 0) + 1
-    
+
     print(f"✅ Found full text for {fulltext_count}/{len(papers)} papers")
     if source_counts:
         print("   Sources after deduplication:")
         for source, count in source_counts.items():
             print(f"   - {source}: {count} papers")
-    
+
     # Step 4a: (disabled) Classify papers into domains
     # NOTE: Domain classification is intentionally disabled per user request.
     # If you want to re-enable LLM-based domain classification, uncomment
     # the following line.
     # papers = classify_paper_domains(papers)
-    
+
     # Step 4b: Compute publication statistics
     print("\n📊 Computing publication statistics...")
     pub_stats = compute_publication_stats(papers, author_info)
-    
+
     # Step 5: Generate LLM summary
     print(f"\n🤖 Generating comprehensive research summary...")
     summary = generate_author_summary(display_name, author_info, papers)
-    
+
     # -----------------------------
     # Display Results
     # -----------------------------
     print("\n" + "=" * 80)
     print(f"AUTHOR PROFILE: {display_name}")
     print("=" * 80)
-    
+
     # Get ORCID
     orcid = author_info.get("orcid", "N/A")
     if orcid and orcid.startswith("https://orcid.org/"):
         orcid = orcid.replace("https://orcid.org/", "")
-    
+
     # Get affiliation
     affiliation_name = "N/A"
     last_institution = author_info.get("last_known_institution", {})
@@ -1411,13 +1513,13 @@ def main():
         institutions = author_info.get("last_known_institutions", [])
         if institutions:
             affiliation_name = institutions[0].get("display_name", "N/A")
-    
+
     print(f"🆔 ORCID: {orcid}")
     print(f"📍 Affiliation: {affiliation_name}")
     print(f"📊 Total Publications: {author_info.get('works_count', 0)}")
     print(f"📈 Total Citations: {author_info.get('cited_by_count', 0)}")
     print(f"🎯 h-index: {author_info.get('summary_stats', {}).get('h_index', 0)}")
-    
+
     print("\n" + "=" * 80)
     print("📊 PUBLICATION STATISTICS")
     print("=" * 80)
@@ -1427,19 +1529,19 @@ def main():
     for year in sorted(pub_stats['papers_per_year'].keys(), reverse=True)[:10]:
         count = pub_stats['papers_per_year'][year]
         print(f"  {year}: {count} papers")
-    
+
     print(f"\n👥 Collaboration Patterns:")
     print(f"Total Unique Collaborators: {pub_stats['collaboration_stats']['total_coauthors']}")
     print(f"Average Co-authors per Paper: {pub_stats['collaboration_stats']['avg_coauthors_per_paper']:.1f}")
     print(f"\nTop 10 Collaborators:")
     for name, count in pub_stats['top_collaborators'][:10]:
         print(f"  {name}: {count} papers")
-    
+
     print("\n" + "=" * 80)
     print("🧠 RESEARCH SUMMARY")
     print("=" * 80)
     print(summary)
-    
+
     # Instead of grouping by domain, show all papers sequentially sorted by
     # citation count (most cited first). Domain classification is disabled, so
     # we present a simple, reproducible paper list with summaries.
@@ -1449,7 +1551,7 @@ def main():
 
     # Sort all papers by citation count (descending)
     all_sorted = sorted(papers, key=lambda x: x.get("cited_by_count", 0), reverse=True)
-    print(all_sorted)
+    #print(all_sorted)
     # Paginate output: show 10 papers at a time
     page_size = 10
     total = len(all_sorted)
@@ -1498,7 +1600,7 @@ def main():
             except Exception:
                 # Non-interactive environment: continue automatically
                 pass
-    
+
     print("\n" + "=" * 80)
     print("✅ Analysis Complete!")
     print("=" * 80)
