@@ -12,3 +12,4 @@ PyPDF2
 pdfplumber
 neo4j 
 pydantic-settings
+openai==0.28
