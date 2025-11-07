@@ -1,132 +1,161 @@
+# 🧠 Author Profile System
 
-# Enhanced Author and Paper Summary Service
+A comprehensive research profiling and summarization system that aggregates data from multiple scholarly APIs, deduplicates abstracts and full texts, extracts content from PDFs, and generates detailed summaries using **GroqCloud (LLaMA 3.3)** (Primary LLM) ,  **OpenAI GPT-4o-mini**( Fallback Option) ,  **Rule-based summarization**  (last fallback Option)
 
-This service provides advanced, multi-source, LLM-generated summaries for academic authors and papers. It leverages the OpenAlex, Unpaywall, and Semantic Scholar APIs to gather comprehensive data, and uses a Groq model to generate insightful summaries.
+This tool allows you to search for an author by **name or ORCID**, fetch all their works from OpenAlex and related sources, and generate:
+- Cleaned, deduplicated paper metadata
+- Co-author networks
+- Research statistics (citations, years active, collaborators)
+- Full paper and author-level summaries (via LLMs)
+- PDF-based content extraction (PyPDF2 / pdfplumber)
 
-## Features
+---
 
-*   **Professor Summaries**: Get a detailed research summary for a professor by name.
-*   **Paper Summaries by ID**: Generate a multi-source summary for a paper using its OpenAlex ID.
-*   **Paper Summaries by Title**: Find a paper by its title and get a detailed summary.
-*   **Multi-source Data Aggregation**: Gathers information from OpenAlex, Unpaywall, and Semantic Scholar for comprehensive analysis.
-*   **LLM-Powered Summaries**: Utilizes a Large Language Model to generate human-like summaries of research work.
+## ✨ Features
 
-## Setup
+- 🔍 Fetches author & paper data from:
+  - **OpenAlex**
+  - **arXiv**
+  - **Semantic Scholar**
+  - **Unpaywall**
+  - **Crossref**
+- 📑 Extracts full text from PDFs (if available)
+- 🧹 Deduplicates overlapping abstracts from multiple sources
+- 🧠 Summarizes research using:
+  - **GroqCloud** (LLaMA 3.3 70B) — primary LLM
+  - **OpenAI GPT-4o-mini** — fallback
+  - **Rule-based summarization** — last fallback
+- 🧍 Displays co-authors, affiliations, and top collaborators
+- 📈 Computes statistics:
+  - Publication velocity
+  - Citations and h-index
+  - Collaboration frequency
+  - 💾 Interactive or non-interactive execution modes
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd <repository-directory>
-    ```
+---
 
-2.  **Install the dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+## 🚀 Installation
 
-3.  **Set up environment variables:**
-    Create a `.env` file in the root directory and add the following:
-    ```
-    GROQ_API_KEY="YOUR_GROQ_API_KEY"
-    MAILTO_EMAIL="your.email@example.com"
-    ```
-    *   `GROQ_API_KEY`: Your API key for the Groq service.
-    *   `MAILTO_EMAIL`: An email address to be used for polite API requests to OpenAlex.
+### 1. Clone the Repository
 
-## API Endpoints
+```bash
+git clone https://github.com/<your-username>/<your-repo>.git
+cd <your-repo>
+```
 
-The service exposes the following endpoints:
+### 2. Set Up Python Environment
 
-### 1. Get Professor Summary by Name
+```bash
+python3 -m venv venv
+source venv/bin/activate   # on Windows: venv\Scripts\activate
+```
 
-*   **Endpoint:** `/professors/summary/by-name`
-*   **Method:** `GET`
-*   **Description:** Generates a research summary for a professor by their full name.
-*   **Query Parameters:**
-    *   `name` (string, required): The full name of the author.
-*   **Example Request:**
-    ```bash
-    curl -X GET "http://127.0.0.1:8000/professors/summary/by-name?name=Geoffrey+Hinton"
-    ```
-*   **Example Response:**
-    ```json
-    {
-      "research_summary": "...",
-      "papers_analyzed": [
-        {
-          "title": "...",
-          "year": 2023,
-          "citations": 1234,
-          "sources": [
-            "OpenAlex",
-            "Unpaywall PDF",
-            "Semantic Scholar"
-          ]
-        }
-      ]
-    }
-    ```
+### 3. Install Dependencies
 
-### 2. Get Paper Summary by ID
+```bash
+pip install -r requirements.txt
+```
 
-*   **Endpoint:** `/paper/by-id`
-*   **Method:** `GET`
-*   **Description:** Generates a detailed, multi-source summary for a single paper by its OpenAlex ID.
-*   **Query Parameters:**
-    *   `paper_id` (string, required): The OpenAlex ID or full OpenAlex URL of the paper.
-*   **Example Request:**
-    ```bash
-    curl -X GET "http://127.0.0.1:8000/paper/by-id?paper_id=W2177745701"
-    ```
-*   **Example Response:**
-    ```json
-    {
-      "paper_info": {
-        "id": "https://openalex.org/W2177745701",
-        "title": "...",
-        ...
-      },
-      "summary": "..."
-    }
-    ```
+---
 
-### 3. Get Paper Summary by Title
+## 🔑 API Keys Setup
 
-*   **Endpoint:** `/paper/by-title`
-*   **Method:** `GET`
-*   **Description:** Finds a paper by its title and generates a detailed, multi-source summary.
-*   **Query Parameters:**
-    *   `title` (string, required): The title of the paper to search for.
-*   **Example Request:**
-    ```bash
-    curl -X GET "http://127.0.0.1:8000/paper/by-title?title=Attention+Is+All+You+Need"
-    ```
-*   **Example Response:**
-    ```json
-    {
-      "paper_info": {
-        "id": "https://openalex.org/W2753945155",
-        "title": "Attention Is All You Need",
-        ...
-      },
-      "summary": "..."
-    }
-    ```
+This system uses both **GroqCloud** and **OpenAI** APIs.
 
-## Core Logic
+### 1. Groq API Key (Recommended)
 
-The service's core logic is divided into two main parts:
+Get your API key from [https://console.groq.com](https://console.groq.com).
 
-### Data Enrichment
+Then either:
 
-1.  **Initial Fetch**: For a given author or paper, the service first fetches initial data from the OpenAlex API.
-2.  **Concurrent Enrichment**: It then concurrently fetches additional data from other sources:
-    *   **Unpaywall**: To get the full text of the paper from a PDF, if available.
-    *   **Semantic Scholar**: To get the abstract and TLDR (Too Long; Didn't Read) summary.
-3.  **Deduplication**: The gathered content from all sources is deduplicated to avoid redundant information.
+- **Option A:** Set it as an environment variable:
+  ```bash
+  export GROQ_API_KEY="your_groq_api_key_here"
+  ```
+- **Option B:** Save it in `~/.groq_api_key`  
+  (the program can do this for you interactively on first run).
 
-### Summarization
+### 2. OpenAI API Key (Optional Fallback)
 
-1.  **LLM-Powered Generation**: The enriched and deduplicated content is then passed to a Large Language Model (LLM) via the Groq API.
-2.  **Structured Summaries**: The LLM is prompted to generate a structured summary with sections like "Background", "Main Contribution", "Methodology", "Results/Findings", and "Implications/Impact".
-3.  **Fallback Mechanism**: If the LLM fails to generate a summary, a fallback mechanism provides a simple excerpt of the available content.
+Get your OpenAI key from [https://platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys)
+
+Then:
+```bash
+export OPENAI_API_KEY="your_openai_api_key_here"
+```
+
+---
+
+## 🧰 Usage
+
+Run the system:
+
+```bash
+python kc_core.py
+```
+
+You’ll be prompted to search for an author:
+
+```
+Search by (1) Name or (2) ORCID? Enter 1 or 2:
+```
+
+Then follow interactive steps to:
+- Select author (if multiple found)
+- Choose how many papers to fetch
+- View publication statistics and summaries
+
+
+
+## ⚡ Example Workflow
+
+1. Run the script.
+2. Search author by **name** (e.g., *"Yogesh Simmhan"*).
+3. Select the correct OpenAlex profile.
+4. The system:
+   - Fetches metadata from 5 APIs.
+   - Downloads open-access PDFs when available.
+   - Deduplicates content.
+   - Generates author and paper summaries.
+   - Prints publication stats and collaboration graphs.
+
+---
+
+## 📦 Outputs
+
+- Output of:
+  - Author profile
+  - Research summary
+  - Top collaborators
+  - Summarized paper list
+
+
+---
+
+## 🧩 Additional Features 
+
+| Feature | How to Enable |
+|----------|----------------|
+| **PDF text extraction** | Install `PyPDF2` and `pdfplumber` (already in `requirements.txt`) |
+| **Full author merging via ORCID** | Automatically enabled if multiple profiles share same ORCID |
+| **Non-interactive mode** | Pipe default answers or run via cron/script |
+
+---
+
+
+---
+
+## 🧰 Tech Stack
+
+- **Python 3.8+**
+- **aiohttp / asyncio** — parallel I/O
+- **requests** — API calls
+- **PyPDF2 / pdfplumber** — PDF parsing
+- **GroqCloud / OpenAI API** — LLM summarization
+- **OpenAlex, Crossref, Semantic Scholar, arXiv, Unpaywall APIs**
+
+
+
+## 📜 License
+
+MIT License © 2025  
