@@ -115,9 +115,9 @@ Before installation, ensure you have:
 
 Step 1 - Clone Repository
 
-  git clone
+  git clone https://github.com/Cloudforge2/ScholarSphere.git
 
-  cd Scholar-sphere-latest
+  cd ScholarSphere/Scholar-sphere-latest
 
 
 
