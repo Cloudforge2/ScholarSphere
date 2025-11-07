@@ -1,15 +1,15 @@
+
+## 📦 `requirements.txt`
 # Core libraries for making HTTP requests
-requests
-aiohttp
+aiohttp>=3.9.0
+requests>=2.31.0
 
-# Web framework for the API endpoint
-fastapi
-uvicorn[standard]
+# For PDF text extraction , OpenAI connectivity as fallback functionality
 
-# Optional, but highly recommended for PDF text extraction
-# The script has fallback logic, but these are needed for full functionality.
-PyPDF2
-pdfplumber
-neo4j 
-pydantic-settings
-openai==0.28
+
+PyPDF2>=3.0.1
+pdfplumber>=0.11.0
+openai>=1.40.0
+tqdm>=4.66.0
+beautifulsoup4>=4.12.3
+lxml>=5.2.1
