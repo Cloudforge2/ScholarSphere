@@ -85,6 +85,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://scholarsphere-mysql:3306/scholarsphere_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: scholar_user
       SPRING_DATASOURCE_PASSWORD: StrongPassword123!
+      GROQ_API_KEY: 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
+      OPENAI_API_KEY: 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
+      
     ports:
       - "8080:8080"
     depends_on:
