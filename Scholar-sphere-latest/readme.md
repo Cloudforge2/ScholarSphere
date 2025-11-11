@@ -900,6 +900,60 @@ OpenAlex, Crossref, Semantic Scholar, arXiv, Unpaywall APIs
 
 MIT License © 2025
 
+### Screenshots
+
+Below are screenshots of the main functionalities of our application.
+
+<p align="center">
+  <img src="screenshots/register.png" width="700" alt="Frontend - Register" /><br>
+  <em>Register page — for new users</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/login.png" width="700" alt="Frontend - Login" /><br>
+  <em>Login page — sign-in for users</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/search-prof-byname.png" width="700" alt="Frontend - Search" /><br>
+  <em>Dashboard — Search a professor by name</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/author-selection.png" width="700" alt="Graph Service - Graph View" /><br>
+  <em>shows all authors with matching name-- select one and type of graph you want to see</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/paper-graph.png" width="700" alt="Graph Service - Graph View" /><br>
+  <em>Graph visualization page with author and his papers — interactive nodes and edges</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/paper-summary.png" width="700" alt="Summary Service - paper summary" /><br>
+  <em>Click on paper node to get summary</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/professor-summary.png" width="700" alt="Summary Service - professor summary" /><br>
+  <em>Click on professor node to get summary</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/domain-graph.png" width="700" alt="Graph Service - Graph View" /><br>
+  <em>Graph visualization page with all research domains of professor — interactive nodes and edges</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/domain-paper-graph.png" width="700" alt="Graph Service - Graph View" /><br>
+  <em>Graph visualization page with all papers of professor in this research domain — interactive nodes and edges</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/coauthor-graph.png" width="700" alt="Graph Service - Graph View" /><br>
+  <em>Graph visualization page with all coauthors of professor — interactive nodes and edges</em>
+</p>
+
 
 
 
