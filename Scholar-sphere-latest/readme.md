@@ -65,37 +65,37 @@ Scholar-sphere-latest/
 
 
 ## 3. Architecture Diagram
-
-┌────────────────────────┐
+```
+                   ┌────────────────────────┐
                    │       Frontend         │
                    │  (Spring Boot + Thyme) │
                    └──────────┬─────────────┘
                               │
                               ▼
                ┌────────────────────────────┐
-               │        Graph Service        
-               │  Spring Boot + Neo4j Driver 
-               └──────────┬──────────────────┘
+               │        Graph Service       | 
+               │  Spring Boot + Neo4j Driver| 
+               └──────────────┬─────────────┘
                               │
                               ▼
-               ┌────────────────────────────┐
-               │     Summarization Service   
-               │  FastAPI + LLM (Groq/OpenAI)
-               └──────────┬──────────────────┘
+               ┌─────────────────────────────┐
+               │     Summarization Service   |
+               │  FastAPI + LLM (Groq/OpenAI)|
+               └──────────────┬──────────────┘
                               │
                               ▼
-               ┌────────────────────────────┐
+               ┌─────────────────────────────┐
                │       Neo4j Database        │
                │  (authors, papers, summary) │
-               └────────────────────────────┘
+               └─────────────────────────────┘
                               ▲
                               │
-               ┌────────────────────────────┐
+               ┌─────────────────────────────┐
                │       Scrappy Service       │
                │ go lang service for OpenAlex│
-               └────────────────────────────┘
+               └─────────────────────────────┘
 
-
+```
 
 ## 4. Prerequisites
 
@@ -113,7 +113,7 @@ Before installation, ensure you have:
 
 ## 5. Environment Setup and running application
 
-Step 1 - Clone Repository
+**Step 1 - Clone Repository**
 ```
   git clone https://github.com/Cloudforge2/ScholarSphere.git
   
@@ -122,7 +122,7 @@ Step 1 - Clone Repository
 
 
 
-Step 2 - Build and Start All Containers
+**Step 2 - Build and Start All Containers**
 
 From the root project directory:
 ```
@@ -181,27 +181,26 @@ Cached results make subsequent summary requests and graph requests instant.
 ## 7. Logs and Debugging
 
 You can view service logs live:
-
+```
   docker compose logs -f summary-service
   docker compose logs -f graph-service
-
+```
 To stop all containers:
-
+```
   docker compose down
-
+```
 To rebuild after making code changes:
-
+```
   docker compose up --build --force-recreate
-
+```
 To check container health:
-
+```
   docker ps
+```
 
 
 
-
-
-|--------------|-----------------------|------------------|---------------------|--------------|-----------------------|------------------|
+---
 
 # Neo4j schema:
 
@@ -246,7 +245,7 @@ The schema models authors, their institutional affiliations, research fields, an
 ## 4. Graph Hierarchy Summary
 
 The hierarchy of research areas and entities in the Scholar-Sphere graph looks like this:
-
+```
 (:Author)
    ├── [:AFFILIATED_WITH] → (:Institution)
    ├── [:AUTHORED] → (:Work)
@@ -255,7 +254,7 @@ The hierarchy of research areas and entities in the Scholar-Sphere graph looks l
     └── [:HAS_TOPIC] → (:Topic)
 (:Topic) → (:Subfield) → (:Field) → (:Domain)
 
-
+```
 
 ## 5. Useful Queries for Exploration
 
@@ -352,7 +351,7 @@ Core Responsibilities
 
 
 ## Architecture Overview
-
+```
 +-----------------------------+
 |      ScholarSphere UI       |
 | (Frontend-Service / Thymeleaf)
@@ -368,7 +367,7 @@ Core Responsibilities
           +------------+
           |   Neo4j DB |
           +------------+
-
+```
 
 
 Data Model
@@ -407,19 +406,19 @@ All endpoints are prefixed with:
 ## Example Usage
 
 Get Professor Graph 
-
+```
   curl -X GET "http://localhost:8082/api/professors/https://openalex.org/A5041794289/graph" 
- 
+ ```
 
 Get Coauthors 
-
+```
   curl -X GET "http://localhost:8082/api/professors/coauthors?id=https://openalex.org/A5041794289" 
  
-
+```
 Get Topics by Author 
-
+```
   curl -X GET "http://localhost:8082/api/professors/topics?id=https://openalex.org/A5041794289" 
- 
+ ```
 
 
 ## 🧱 Key Classes Overview
@@ -532,8 +531,11 @@ mvn test
 
 
 
+---
+# Scrappy
+documentation is in the scrappy service directory. ty
 
-|--------------|-----------------------|------------------|---------------------|--------------|-----------------------|------------------|
+
 
 # Frontend Service (Spring Boot + Thymeleaf)
 
@@ -719,7 +721,8 @@ mvn test
 
 
 
-|--------------|-----------------------|------------------|---------------------|--------------|-----------------------|------------------|
+
+---
 
 # Summary Service
 
