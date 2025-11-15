@@ -114,19 +114,20 @@ Before installation, ensure you have:
 ## 5. Environment Setup and running application
 
 Step 1 - Clone Repository
-
+```
   git clone https://github.com/Cloudforge2/ScholarSphere.git
-
+  
   cd ScholarSphere/Scholar-sphere-latest
+```
 
 
 
 Step 2 - Build and Start All Containers
 
 From the root project directory:
-
+```
   docker-compose up --build
-
+```
 This will start:
 
 | **Container** | **Description** | **Port** |
@@ -148,13 +149,13 @@ Step 3 - Access points:
 | **Summary Service API** | [http://localhost:8085/professors/summary/by-id?id=https://openalex.org/A5041794289](http://localhost:8085/professors/summary/by-id?id=https://openalex.org/A5041794289) |
 | **Neo4j Browser** | [http://localhost:7474](http://localhost:7474) |
 
-
+```
 Login credentials:
 
   Neo4j: neo4j / test123!
 
   MySQL: scholar_user / StrongPassword123!
-
+```
 
 
 ## 6. Data Flow Summary
@@ -202,9 +203,9 @@ To check container health:
 
 |--------------|-----------------------|------------------|---------------------|--------------|-----------------------|------------------|
 
-Neo4j schema:
+# Neo4j schema:
 
-# 1. Overview
+## 1. Overview
 
 Scholar-Sphere uses Neo4j as its primary graph database to represent researchers, their publications, and their academic domains.
 The schema models authors, their institutional affiliations, research fields, and topics of expertise, forming a rich interconnected academic knowledge graph.
@@ -260,52 +261,54 @@ The hierarchy of research areas and entities in the Scholar-Sphere graph looks l
 
 Get All Authors with Summaries
 
+```
   MATCH (a:Author)
   WHERE a.researchSummary IS NOT NULL
   RETURN a.displayName AS name, a.worksCount AS works, a.citedByCount AS citations
   ORDER BY citations DESC LIMIT 10;
-
+```
 List All Works by an Author
-
+```
   MATCH (a:Author {id: ")
   RETURN w.title AS title, w.publicationYear AS year, w.citedByCount AS citations
   ORDER BY year DESC;
-
+```
 Author’s Affiliations
-
+```
   MATCH (a:Author {id: ")
   RETURN i.displayName AS institution;
-
+```
 Topics Linked to an Author
-
+```
   MATCH (a:Author {id: ")
   RETURN t.displayName AS topic, t.score ORDER BY t.score DESC LIMIT 10;
-
+```
 Co-Authors via Shared Papers
-
+```
   MATCH (a1:Author {id: ")
   WHERE a1 <> a2
   RETURN DISTINCT a2.displayName AS coauthor, count(w) AS shared_papers
   ORDER BY shared_papers DESC LIMIT 10;
-
+```
 Domain Hierarchy Example
-
+```
   MATCH (t:Topic {displayName: "Provenance"})-[:IN_SUBFIELD]->(s:Subfield)-[:IN_FIELD]->(f:Field)-[:IN_DOMAIN]->(d:Domain)
   RETURN t.displayName AS topic, s.displayName AS subfield, f.displayName AS field, d.displayName AS domain;
-
+```
 
 
 ## 6. Schema Visualization
 
 You can visualize the schema directly in Neo4j Browser using:
-
+```
   CALL db.schema.visualization();
-
+```
 Or, if you want a text-based overview:
-
+```
   MATCH (a)-[r]->(b)
   RETURN DISTINCT labels(a) AS from, type(r) AS rel_type, labels(b) AS to
   ORDER BY rel_type;
+```
 
 
 
@@ -313,11 +316,9 @@ Or, if you want a text-based overview:
 
 
 
-|--------------|-----------------------|------------------|---------------------|--------------|-----------------------|------------------|
+# Graph Service (Spring Boot + Neo4j)
 
-Graph Service (Spring Boot + Neo4j)
-
-# Overview
+## Overview
 
 The Graph Service is a Spring Boot–based microservice responsible for interacting with the Neo4j Knowledge Graph.
 It exposes REST endpoints to retrieve and query academic entities — professors, their authored papers, coauthors, topics, and institutional relationships — as a structured graph.
@@ -467,7 +468,7 @@ ProfessorService.shouldIngest()
 This service is part of the Scholar-Sphere Docker Compose network.
 
 In docker-compose.yml:
-
+```
 graph-service:
   build: ./Graph-service
   container_name: graph
@@ -483,37 +484,39 @@ graph-service:
       condition: service_healthy
   networks:
     - scholarsphere-net
-
+```
 Start command:
-
+```
   docker-compose up --build graph-service
-
+```
 
 ## Local Development Setup
 
 Start Neo4j (via Docker Compose or standalone)
-
+```
   docker-compose up -d neo4j
-
+```
 Run the Graph Service locally
-
+```
   mvn spring-boot:run
-
+```
 Access endpoints
-
+```
   http://localhost:8082/api/professors 
-   
+```
 
 
 
 ## Build & Test Commands
 
 # Build the project
+```
 mvn clean package
-
+```
 # Run tests
+```
 mvn test
-
+```
 
 
 
@@ -532,9 +535,9 @@ mvn test
 
 |--------------|-----------------------|------------------|---------------------|--------------|-----------------------|------------------|
 
-Frontend Service (Spring Boot + Thymeleaf)
+# Frontend Service (Spring Boot + Thymeleaf)
 
-# Overview
+## Overview
 
 The Frontend Service is a Spring Boot–based web application that provides the user interface for Scholar-Sphere — an intelligent research exploration platform.
  It enables interactive visualization of professor networks, coauthor graphs, research topics, and summaries of academic papers, integrating multiple backend microservices seamlessly.
@@ -660,7 +663,7 @@ API Type: MVC + REST (via RestTemplate)
 
 
 # Docker Integration
-
+```
 frontend-service:
   platform: linux/amd64
   build: ./Frontend-service
@@ -678,31 +681,35 @@ frontend-service:
   networks:
     - scholarsphere-net
 
-
+```
 
 
 # Local Development Setup
 
 # Start dependent containers
+```
 docker-compose up -d graph-service scrappy summary-service mysql
-
+```
 # Run frontend service locally
+```
 mvn spring-boot:run
-
+```
 # Access in browser
-http://localhost:8080/
 
+http://localhost:8080/
 
 🧪 Build & Test
 
 
 
 # Build the project
+```
 mvn clean package
-
+```
 # Run tests
+```
 mvn test
-
+```
 
 
 
@@ -714,7 +721,7 @@ mvn test
 
 |--------------|-----------------------|------------------|---------------------|--------------|-----------------------|------------------|
 
-Summary Service
+# Summary Service
 
 
 
@@ -777,18 +784,19 @@ This tool allows you to search for an author by name or ORCID, fetch all their w
 🚀 Installation
 
 # 1. Clone the Repository
+```
 
 git clone cd <your-repo>
-
+```
 ## 2. Set Up Python Environment
-
+```
 python3 -m venv venv
 source venv/bin/activate   # on Windows: venv\Scripts\activate
-
+```
 ## 3. Install Dependencies
-
+```
 pip install -r requirements.txt
-
+```
 
 
 🔑 API Keys Setup
@@ -812,16 +820,17 @@ Then either:
 Get your OpenAI key from
 
 Then:
-
+```
 export OPENAI_API_KEY="your_openai_api_key_here"
 
-
+```
 
 🧰 Usage
 
 Run the system:
-
+```
 python kc_core.py
+```
 
 You’ll be prompted to search for an author:
 

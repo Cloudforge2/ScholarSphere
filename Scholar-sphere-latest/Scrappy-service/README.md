@@ -2,7 +2,7 @@
 
 A Go-based web service that fetches academic data from the OpenAlex API and populates it into a rich, hierarchical Neo4j graph database.
 
-This application provides a simple API to search for authors and works, ingesting them and their relationships into Neo4j. It's designed for performance, using **asynchronous background processing** for large datasets and efficient bulk database operations to build a deeply connected graph of academic knowledge.
+This application provides a simple API to search for authors and works, ingesting them and their relationships into Neo4j.
 
 ## Features
 
@@ -60,7 +60,45 @@ The service builds the following model in your Neo4j database:
 
 ## 🚀 Getting Started
 
-*(Prerequisites and Installation steps remain the same)*
+
+### Prerequisites
+
+*   **Go:** Version 1.18 or higher.
+*   **Neo4j Database:** A running instance of Neo4j.
+<!-- *   **Git:** For cloning the repository. -->
+
+### Installation & Setup
+
+<!-- 1.  **Clone the Repository**
+    ```sh
+    git clone https://github.com/Cloudforge2/scrappy.git
+    cd scrappy
+    ``` -->
+
+1. **Create a file named `.env` in the root of the project. Fill in your Neo4j database credentials.**
+
+    ```env
+    # .env
+    NEO4J_URI=neo4j://localhost:7687
+    NEO4J_USERNAME=neo4j
+    NEO4J_PASSWORD=your_super_secret_password
+    ```
+
+2.  **Install Dependencies**
+    ```sh
+    go mod tidy
+    ```
+
+3.  **Run the Server**
+    ```sh
+    go run ./cmd/main.go
+    ```
+    You should see the server start on port 8083:
+    ```
+    Successfully connected to Neo4j
+    Starting interactive API server on http://localhost:8083
+    ```
+
 
 ## 📚 API Endpoints
 
@@ -70,15 +108,30 @@ The server runs on `http://localhost:8083`.
 
 ### 1. Find Authors by Name (Discovery)
 
-Searches for and returns a list of authors matching the name query. This is a read-only endpoint used for discovery.
+Finds potential author matches from OpenAlex. This is a read-only endpoint used to discover an author's ID. **It does not save anything to the database.**
 
 *   **Endpoint:** `GET /api/fetch-authors-by-name`
-*   **Query Parameters:** `name` (string, required) - The name of the author.
+*   **Query Parameters:**
+    | Parameter | Type   | Description             | Required |
+    | :-------- | :----- | :---------------------- | :------- |
+    | `name`    | string | The name of the author. | Yes      |
 *   **Example Usage:**
     ```sh
-    curl "http://localhost:8083/api/fetch-authors-by-name?name=Stephen%20Hawking"
+    curl "http://localhost:8083/api/fetch-authors-by-name?name=Yogesh%20Simmhan"
     ```
-*   **Success Response (200 OK):** An array of matching authors, including ID, `displayName`, and `orcid`.
+*   **Success Response (200 OK):** An array of matching authors.
+    ```json
+    [
+      {
+        "id": "https://openalex.org/A5023896336",
+        "displayName": "Yogesh Simmhan",
+        "lastKnownInstitution": "Indian Institute of Science",
+        "citedByCount": 3583,
+        "updatedDate": "2024-07-29T17:15:15.580218",
+        "orcid": "https://orcid.org/0000-0003-0130-3945"
+      }
+    ]
+    ```
 
 ---
 
@@ -91,7 +144,10 @@ Searches for and returns a list of authors matching the name query. This is a re
 *   **Post-Ingestion:** The `Author` node's `fullyIngested` property is set to `true` after the background process completes.
 
 *   **Endpoint:** `GET /api/fetch-author-by-id`
-*   **Query Parameters:** `id` (string, required) - The author's full OpenAlex ID (e.g., `A5041794289`).
+*   **Query Parameters:**
+    | Parameter | Type   | Description                    | Required |
+    | :-------- | :----- | :----------------------------- | :------- |
+    | `id`      | string | The author's full OpenAlex ID. | Yes      |
 *   **Example Usage:**
     ```sh
     curl "http://localhost:8083/api/fetch-author-by-id?id=A5041794289"
@@ -105,7 +161,7 @@ Searches for and returns a list of authors matching the name query. This is a re
     }
     ```
 
----
+<!-- ---
 
 ### 3. Ingest Single Work by Name (Synchronous)
 
@@ -120,9 +176,9 @@ Searches for and ingests the **first** matching Work found by name. This is a sy
     ```
 *   **Success Response (200 OK):** Confirmation of the successful save.
 
----
+--- -->
 
-### 4. Get Author's Works (Read-Only)
+### 3. Get Author's Works (Read-Only)
 
 Fetches the **30 most highly cited** works for a given author from OpenAlex. **Does not save to the database.**
 
@@ -134,9 +190,9 @@ Fetches the **30 most highly cited** works for a given author from OpenAlex. **D
     ```
 *   **Success Response (200 OK):** A JSON array of up to 30 `Work` objects.
 
----
 
-### 5. Get Author's Abstract Inverted Indexes (Read-Only)
+
+<!-- ### 5. Get Author's Abstract Inverted Indexes (Read-Only)
 
 Fetches abstract data (specifically the `abstract_inverted_index`) for the 30 most highly-cited works by an author, using a custom select query on the OpenAlex API. **Does not save to the database.**
 
@@ -146,9 +202,9 @@ Fetches abstract data (specifically the `abstract_inverted_index`) for the 30 mo
     ```sh
     curl "http://localhost:8083/api/fetch-abstracts/?id=A5041794289"
     ```
-*   **Success Response (200 OK):** A JSON array of simplified publication objects containing `title`, `publication_year`, `cited_by_count`, and the raw `abstract_inverted_index`.
+*   **Success Response (200 OK):** A JSON array of simplified publication objects containing `title`, `publication_year`, `cited_by_count`, and the raw `abstract_inverted_index`. -->
 
----
+
 
 ## Recommended Workflow
 
