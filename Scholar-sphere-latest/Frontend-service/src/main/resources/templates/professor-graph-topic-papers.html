@@ -86,9 +86,23 @@
 </head>
 
 <body>
-<header>
-    <span th:text="${pageTitle}"></span> — <span th:text="${professorName}"></span>
-</header>
+
+
+<header style="display:flex; justify-content:space-between; align-items:center;">
+    
+    <!-- LEFT: Page title -->
+    <div>
+        <span th:text="${pageTitle}"></span> — <span th:text="${professorName}"></span>
+    </div>
+  
+    <!-- RIGHT: New Search button -->
+    <button onclick="window.location.href='/main'"
+            style="background:white; color:#2563eb; border:none;
+                   padding:8px 15px; border-radius:8px;
+                   font-weight:600; cursor:pointer;">
+        New Search
+    </button>
+  </header>
 
 <a href="javascript:history.back()" class="back-button">← Back to Research Domains</a>
 

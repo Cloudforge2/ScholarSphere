@@ -53,8 +53,21 @@
   </style>
 </head>
 <body>
-<header>
-  Research Topics for <span th:text="${professorName}"></span>
+
+<header style="display:flex; justify-content:space-between; align-items:center;">
+    
+  <!-- LEFT: Page title -->
+  <div>
+    Research Topics for <span th:text="${professorName}"></span>
+  </div>
+
+  <!-- RIGHT: New Search button -->
+  <button onclick="window.location.href='/main'"
+          style="background:white; color:#2563eb; border:none;
+                 padding:8px 15px; border-radius:8px;
+                 font-weight:600; cursor:pointer;">
+      New Search
+  </button>
 </header>
 
 <div id="graph-container"></div>
