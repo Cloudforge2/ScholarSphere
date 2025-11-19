@@ -32,7 +32,7 @@ func NewClient() *Client {
 // This is an example of fetching a SINGLE entity.
 func (c *Client) FetchAuthorById(authorID string) (domain.Author, error) {
 	// Example URL: https://api.openalex.org/authors/A12345?mailto=...
-	url := fmt.Sprintf("%s/authors/%s?data-version=1", openAlexAPIBaseURL, authorID)
+	url := fmt.Sprintf("%s/authors/%s", openAlexAPIBaseURL, authorID)
 
 	var author domain.Author
 	err := c.fetchAndDecode(url, &author)
@@ -40,7 +40,7 @@ func (c *Client) FetchAuthorById(authorID string) (domain.Author, error) {
 		return domain.Author{}, err
 	}
 	fmt.Println("url:", url)
-	fmt.Println("author topics:", len(author.Topics))
+	// fmt.Println("author topics:", len(author.Topics))
 
 	return author, nil
 }
@@ -161,7 +161,7 @@ func (c *Client) FetchAllWorksByAuthorID(authorID string) ([]domain.Work, error)
 	perPage := 200
 
 	for {
-		url := fmt.Sprintf("%s/works?filter=author.id:%s&per-page=%d&data-version=1&cursor=%s", openAlexAPIBaseURL, authorID, perPage, url.QueryEscape(cursor))
+		url := fmt.Sprintf("%s/works?filter=author.id:%s&per-page=%d&cursor=%s", openAlexAPIBaseURL, authorID, perPage, url.QueryEscape(cursor))
 
 		var resp struct {
 			Results []domain.Work `json:"results"`

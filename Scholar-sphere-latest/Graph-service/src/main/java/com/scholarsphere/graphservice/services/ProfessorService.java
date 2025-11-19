@@ -1,5 +1,6 @@
 package com.scholarsphere.graphservice.services;
 
+import com.DTO.TopicStat;
 import com.scholarsphere.graphservice.model.Paper;
 import com.scholarsphere.graphservice.model.Professor;
 import com.scholarsphere.graphservice.repository.ProfessorRepository;
@@ -82,7 +83,7 @@ public class ProfessorService {
     /**
  * 3️⃣ Fetch all topics for a given author ID
  */
-public List<String> getTopicsByAuthorId(String authorId) {
+public List<TopicStat> getTopicsByAuthorId(String authorId) {
     System.out.println("service: Fetching topics for author ID: " + authorId);
     return professorRepository.findTopicsByAuthorId(authorId);
 }

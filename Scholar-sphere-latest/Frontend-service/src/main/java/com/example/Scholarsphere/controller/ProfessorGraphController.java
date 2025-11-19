@@ -1,5 +1,6 @@
 package com.example.Scholarsphere.controller;
 
+import com.example.Scholarsphere.DTO.TopicStat;
 import com.example.Scholarsphere.model.Paper;
 import com.example.Scholarsphere.model.Professor;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -432,7 +433,7 @@ public String topicGraphPage(@RequestParam String id, @RequestParam String name,
 
         // Step 2️⃣ Fetch topics of this author
         String topicUrl = GRAPH_SERVICE_URL + "topics?id=" + encodedId;
-        String[] topics = restTemplate.getForObject(topicUrl, String[].class);
+        TopicStat[] topics = restTemplate.getForObject(topicUrl, TopicStat[].class);
 
         if (topics == null || topics.length == 0) {
             System.out.println("⚠️ No topics found for author " + id);
@@ -455,13 +456,13 @@ public String topicGraphPage(@RequestParam String id, @RequestParam String name,
         addedNodeIds.add(id);
 
         // Add topic nodes and edges
-        for (String topic : topics) {
-            String nodeId = topic.replaceAll("\\s+", "_");
+        for (TopicStat topic : topics) {
+            String nodeId = topic.getTopic().replaceAll("\\s+", "_");
 
             if (!addedNodeIds.contains(nodeId)) {
                 nodes.add(Map.of("data", Map.of(
                         "id", nodeId,
-                        "label", topic,
+                        "label", topic.getTopic(),
                         "type", "topic"
                 )));
                 addedNodeIds.add(nodeId);

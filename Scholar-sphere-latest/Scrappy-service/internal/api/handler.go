@@ -77,7 +77,6 @@ func (h *APIHandler) FetchAndSaveAuthorByNameHandler(w http.ResponseWriter, r *h
 		UpdatedDate          string `json:"updatedDate,omitempty"`
 		Orcid                string `json:"orcid,omitempty"`
 		WorksCount           int    `json:"worksCount,omitempty"`
-
 	}
 
 	var resp []authorResponse
@@ -94,7 +93,6 @@ func (h *APIHandler) FetchAndSaveAuthorByNameHandler(w http.ResponseWriter, r *h
 			UpdatedDate:          a.UpdatedDate,
 			Orcid:                a.Orcid,
 			WorksCount:           a.WorksCount,
-			
 		})
 	}
 
@@ -109,7 +107,7 @@ func (h *APIHandler) FetchAndSaveWorksByAuthorHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	log.Printf("Received request to ingest all works for author ID: %s", authorID)
+	log.Printf("Received request to ingest all works for authorssID: %s", authorID)
 	author, err := h.alexClient.FetchAuthorById(authorID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch author from OpenAlex: %v", err))
@@ -188,8 +186,8 @@ func (h *APIHandler) FetchAndSaveWorksByAuthorHandler(w http.ResponseWriter, r *
 			}
 			log.Printf("Background task finished for author %s. All %d works processed.", authorID, len(works))
 
-			 // ✅ NEW CODE — mark author as fully ingested after background processing
-			 if err := h.repo.MarkAuthorFullyIngested(backgroundCtx, authorID); err != nil {
+			// ✅ NEW CODE — mark author as fully ingested after background processing
+			if err := h.repo.MarkAuthorFullyIngested(backgroundCtx, authorID); err != nil {
 				log.Printf("WARN: Could not set fullyIngested flag for author %s: %v", authorID, err)
 			} else {
 				log.Printf("✅ Author %s marked as fully ingested in Neo4j.", authorID)
@@ -205,7 +203,6 @@ func (h *APIHandler) FetchAndSaveWorksByAuthorHandler(w http.ResponseWriter, r *
 			log.Printf("✅ Author %s marked as fully ingested in Neo4j (immediate).", authorID)
 		}
 	}
-
 
 	// 7. Immediately respond to the user with a "202 Accepted" status.
 	// This tells them the process has started successfully.

@@ -1,5 +1,6 @@
 package com.scholarsphere.graphservice.repository;
 
+import com.DTO.TopicStat;
 import com.scholarsphere.graphservice.model.Paper;
 import com.scholarsphere.graphservice.model.Professor;
 import org.springframework.data.neo4j.repository.Neo4jRepository;
@@ -39,12 +40,11 @@ public interface ProfessorRepository extends Neo4jRepository<Professor, String> 
 
 
 // ✅ Get distinct topics for a given author (direct HAS_TOPIC relationship)
-@Query("""
-    MATCH (a:Author {id: $authorId})-[:HAS_TOPIC]->(t:Topic)
-    RETURN DISTINCT t.displayName AS topic
-    ORDER BY topic
-    """)
-List<String> findTopicsByAuthorId(String authorId);
+@Query("MATCH (a:Author {id: $authorId}) " +
+"MATCH (a)-[:AUTHORED]->(w:Work)-[:IS_ABOUT_TOPIC]->(t:Topic) " +
+"RETURN t.displayName AS topic, count(DISTINCT w) AS count " +
+"ORDER BY count DESC")
+List<TopicStat> findTopicsByAuthorId(String authorId);
 
 // ✅ Get all papers for a given author and topic (linked via HAS_TOPIC)
 @Query("""

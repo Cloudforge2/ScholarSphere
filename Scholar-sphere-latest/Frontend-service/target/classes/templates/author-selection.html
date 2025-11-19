@@ -97,7 +97,22 @@
     </style>
 </head>
 <body>
-    <header>ScholarSphere - Select Author</header>
+
+    <header style="display:flex; justify-content:space-between; align-items:center;">
+    
+        <!-- LEFT: Page title -->
+        <div>
+           Select Author
+        </div>
+      
+        <!-- RIGHT: New Search button -->
+        <button onclick="window.location.href='/main'"
+                style="background:white; color:#2563eb; border:none;
+                       padding:8px 15px; border-radius:8px;
+                       font-weight:600; cursor:pointer;">
+            New Search
+        </button>
+      </header>
 
     <div class="container">
         <h2 th:text="'Authors matching: ' + ${searchName}"></h2>

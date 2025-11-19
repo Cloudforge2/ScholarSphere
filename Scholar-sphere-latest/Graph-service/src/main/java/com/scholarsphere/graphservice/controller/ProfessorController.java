@@ -1,5 +1,6 @@
 package com.scholarsphere.graphservice.controller;
 
+import com.DTO.TopicStat;
 import com.scholarsphere.graphservice.model.Paper;
 import com.scholarsphere.graphservice.model.Professor;
 import com.scholarsphere.graphservice.services.ProfessorService;
@@ -86,11 +87,11 @@ public class ProfessorController {
 
 // 🧠 Get all topics for an author
 @GetMapping("/topics")
-public ResponseEntity<List<String>> getTopicsByAuthorId(@RequestParam String id) {
+public ResponseEntity<List<TopicStat>> getTopicsByAuthorId(@RequestParam String id) {
     String decodedId = URLDecoder.decode(id, StandardCharsets.UTF_8);
     System.out.println("controller : Fetching topics for author ID: " + decodedId);
 
-    List<String> topics = professorService.getTopicsByAuthorId(decodedId);
+    List<TopicStat> topics = professorService.getTopicsByAuthorId(decodedId);
     return ResponseEntity.ok(topics);
 }
 
