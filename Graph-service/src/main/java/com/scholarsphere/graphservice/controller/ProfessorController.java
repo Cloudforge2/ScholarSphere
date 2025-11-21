@@ -101,9 +101,10 @@ public ResponseEntity<List<Paper>> getPapersByAuthorIdAndTopic(
         @RequestParam String id,
         @RequestParam String topicName) {
     String decodedId = URLDecoder.decode(id, StandardCharsets.UTF_8);
-    System.out.println("controller : Fetching papers for author ID: " + decodedId + " and topic: " + topicName);
+    String decodedTopic = URLDecoder.decode(topicName, StandardCharsets.UTF_8);
+    System.out.println("controller : Fetching papers for author ID: " + decodedId + " and topic: " + decodedTopic);
 
-    List<Paper> papers = professorService.getPapersByAuthorIdAndTopic(decodedId, topicName);
+    List<Paper> papers = professorService.getPapersByAuthorIdAndTopic(decodedId, decodedTopic);
     return ResponseEntity.ok(papers);
 }
 

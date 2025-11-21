@@ -2,6 +2,7 @@ package com.example.Scholarsphere.controller;
 
 import java.nio.charset.StandardCharsets;
 
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +19,15 @@ import java.nio.charset.StandardCharsets;
 @Controller
 public class MainController {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    //private final RestTemplate restTemplate = new RestTemplate();
+    private RestTemplate createRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(2000);   // 2 seconds to establish TCP connection
+        factory.setReadTimeout(8000);      // 8 seconds to wait for response body
+        return new RestTemplate(factory);
+    }
+    
+    private final RestTemplate restTemplate = createRestTemplate();
     private static final String FETCH_AUTHORS_BY_NAME_URL = "http://scrappy:8083/api/fetch-authors-by-name?name=";
 
 
@@ -63,7 +72,13 @@ public class MainController {
                 model.addAttribute("searchName", professor);
                 return "author-selection";
 
-            } catch (Exception e) {
+            } catch (org.springframework.web.client.ResourceAccessException e) {
+                // timeouts / connection refused etc.
+                model.addAttribute("error",
+                        "Backend service is unavailable right now. Please try again in a moment.");
+                return "main";
+    
+            }catch (Exception e) {
                 e.printStackTrace();
                 model.addAttribute("error", "Error fetching authors: " + e.getMessage());
                 return "main";

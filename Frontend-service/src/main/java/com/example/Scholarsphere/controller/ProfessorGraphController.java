@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,7 +35,10 @@ public class ProfessorGraphController {
 
 
     public ProfessorGraphController() {
-        this.restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(2000);   // fail fast if backend is down
+        factory.setReadTimeout(20000);      // allow Scrappy to fetch OpenAlex
+        this.restTemplate = new RestTemplate(factory);
     }
 
     // Endpoint to fetch professor graph by name
@@ -151,17 +155,19 @@ public class ProfessorGraphController {
 
         return "professor-graph";
     }
-        catch (Exception e) {
-            System.err.println("ERROR: Could not fetch graph for professor ID " + id + ": " + e.getMessage());
-            e.printStackTrace();
+    catch (Exception graphEx) {
 
-            model.addAttribute("error", "Could not fetch graph for professor ID " + id + ": " + e.getMessage());
-            model.addAttribute("graphJson", "{\"nodes\":[],\"edges\":[]}");
-            model.addAttribute("professorName", "Unknown");
-            model.addAttribute("paperCount", 0);
+        System.err.println("ERROR (professor-graph): " + graphEx.getMessage());
 
-            return "professor-graph";
-        }
+        model.addAttribute("error",
+                "Unable to load professor graph because a backend service is unavailable.");
+
+        model.addAttribute("graphJson", "{\"nodes\":[],\"edges\":[]}");
+        model.addAttribute("professorName", "Unavailable");
+        model.addAttribute("paperCount", 0);
+
+        return "professor-graph";
+    }
 }
 
     
@@ -281,10 +287,15 @@ public String professorSummary(@RequestParam String id, Model model) { // <-- CH
             // 👉 return new view here
             return "professor-graph-coauthor";
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (Exception coauthorEx) {
+            coauthorEx.printStackTrace();
+        
+            model.addAttribute("error",
+                    "Unable to load coauthor graph because a backend service is unavailable.");
+        
             model.addAttribute("graphJson", "{\"nodes\":[],\"edges\":[]}");
-            model.addAttribute("professorName", "Error");
+            model.addAttribute("professorName", "Unavailable");
+        
             return "professor-graph-coauthor";
         }
     }
@@ -354,12 +365,21 @@ public String professorSummary(@RequestParam String id, Model model) { // <-- CH
             }
     
             // 3️⃣ Fetch authors from graph-service
-            String authorsUrl = GRAPH_SERVICE_URL + "paper/authors?id=" +
-                    URLEncoder.encode(paperId, StandardCharsets.UTF_8);
-            System.out.println("DEBUG: Fetching authors from URL: " + authorsUrl);
-    
-            Professor[] authors = restTemplate.getForObject(authorsUrl, Professor[].class);
-            System.out.println("DEBUG: Authors fetched: " + (authors != null ? authors.length : 0));
+            Professor[] authors = null;
+
+            try {
+                String authorsUrl = GRAPH_SERVICE_URL + "paper/authors?id=" +
+                        URLEncoder.encode(paperId, StandardCharsets.UTF_8);
+
+                System.out.println("DEBUG: Fetching authors from URL: " + authorsUrl);
+                authors = restTemplate.getForObject(authorsUrl, Professor[].class);
+
+                System.out.println("DEBUG: Authors fetched: " + (authors != null ? authors.length : 0));
+
+            } catch (Exception graphEx) {
+                System.err.println("❌ Graph-service unavailable (paper authors). Showing summary only.");
+                model.addAttribute("error", "Author graph is unavailable right now.");
+            }
     
             // 4️⃣ Build Graph Data
             List<Map<String, Object>> nodes = new ArrayList<>();
@@ -485,10 +505,15 @@ public String topicGraphPage(@RequestParam String id, @RequestParam String name,
 
         return "professor-graph-topic"; // ✅ Update HTML file accordingly
 
-    } catch (Exception e) {
-        e.printStackTrace();
+    } catch (Exception topicEx) {
+        topicEx.printStackTrace();
+    
+        model.addAttribute("error",
+                "Unable to load research topics because a backend service is unavailable.");
+    
         model.addAttribute("graphJson", "{\"nodes\":[],\"edges\":[]}");
-        model.addAttribute("professorName", "Error");
+        model.addAttribute("professorName", "Unavailable");
+    
         return "professor-graph-topic";
     }
 }
@@ -570,11 +595,16 @@ public String papersGraphPage(
         System.out.println("✅ Paper graph JSON built successfully for " + topicName);
         return "professor-graph-topic-papers"; // ✅ Update HTML file accordingly
 
-    } catch (Exception e) {
-        e.printStackTrace();
+    } catch (Exception topicPapersEx) {
+        topicPapersEx.printStackTrace();
+    
+        model.addAttribute("error",
+                "Unable to load papers for this topic because a backend service is unavailable.");
+    
         model.addAttribute("graphJson", "{\"nodes\":[],\"edges\":[]}");
-        model.addAttribute("professorName", "Error");
+        model.addAttribute("professorName", "Unavailable");
         model.addAttribute("topicName", topicName);
+    
         return "professor-graph-topic-papers";
     }
 }

@@ -223,8 +223,19 @@
 
   <!-- RIGHT PANEL -->
   <div class="graph-panel">
-    <div id="graph-container"></div>
-  </div>
+    <!-- friendly error -->
+    <div th:if="${error}"
+         style="background:#fee2e2; color:#b91c1c; padding:14px;
+                border-radius:12px; margin:25px;
+                text-align:center; font-size:15px; font-weight:600;">
+        <span th:text="${error}"></span>
+    </div>
+
+    <!-- container still exists -->
+    <div id="graph-container"
+         th:if="${error == null}">
+    </div>
+
 </div>
 
 <script th:inline="javascript">
