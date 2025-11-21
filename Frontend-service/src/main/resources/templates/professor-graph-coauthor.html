@@ -199,14 +199,9 @@
           const node = data.nodes.get(nodeId); // Use data.nodes.get() for vis.DataSet
 
           if (node) {
-            // Redirect based on the node's type
-            if (node.type === "prof") {
-                // Action for the main professor
-                window.location.href = "/professor-summary?id=" + node.id;
-            } else if (node.type === "coauthor") {
-                // Action for a coauthor (assuming they are also professors)
-                window.location.href = "/coauthor-graph?id=" + node.id;
-            }
+            // Redirect to professor summary for both prof and coauthor
+            // This prevents nested graph creation and directly shows coauthor details
+            window.location.href = "/professor-summary?id=" + node.id;
           }
         }
       });

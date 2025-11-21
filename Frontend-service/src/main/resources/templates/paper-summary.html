@@ -65,13 +65,14 @@
 
     .summary-content h4.section-title {
       margin-top: 20px;
-      padding: 6px 10px;
-      font-size: 17px;
+      padding: 8px 12px;
+      font-size: 19px; /* Increased from 17px for better visibility */
       font-weight: 700;
-      color: #000000;
-      background-color: #e2e8f0; /* Light gray background */
-      border-left: 4px solid #2563eb; /* Blue accent bar */
+      color: #1e293b;
+      background-color: #e0f2fe; /* Light blue background for better contrast */
+      border-left: 5px solid #0284c7; /* Thicker accent bar */
       border-radius: 6px;
+      letter-spacing: 0.3px;
     }
 
 
@@ -159,6 +160,48 @@
   <!-- LEFT PANEL -->
   <div class="summary-panel">
     <h2 th:text="${title}">Paper Title</h2>
+
+    <!-- Paper Identifiers Section -->
+    <div th:if="${paper != null}" style="margin: 15px 0; padding: 12px; background: #f0f9ff; border-left: 4px solid #0284c7; border-radius: 8px;">
+      <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #0369a1;">📎 Access Original Paper</h3>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <!-- DOI Link -->
+        <a th:if="${paper.doi != null and !#strings.isEmpty(paper.doi)}"
+           th:href="@{${paper.doi}}"
+           target="_blank"
+           style="display: inline-flex; align-items: center; padding: 6px 12px; background: #0284c7; color: white; 
+                  text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600; transition: background 0.2s;">
+          🔗 DOI
+        </a>
+        
+        <!-- arXiv Link -->
+        <a th:if="${paper.arxivId != null and !#strings.isEmpty(paper.arxivId)}"
+           th:href="@{'https://arxiv.org/abs/' + ${paper.arxivId}}"
+           target="_blank"
+           style="display: inline-flex; align-items: center; padding: 6px 12px; background: #b91c1c; color: white; 
+                  text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600; transition: background 0.2s;">
+          📄 arXiv
+        </a>
+        
+        <!-- PMID Link (if available) -->
+        <a th:if="${paper.pmid != null and !#strings.isEmpty(paper.pmid)}"
+           th:href="@{'https://pubmed.ncbi.nlm.nih.gov/' + ${paper.pmid}}"
+           target="_blank"
+           style="display: inline-flex; align-items: center; padding: 6px 12px; background: #059669; color: white; 
+                  text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600; transition: background 0.2s;">
+          🏥 PubMed
+        </a>
+        
+        <!-- OpenAlex Link (always available) -->
+        <a th:if="${paper.openalexId != null and !#strings.isEmpty(paper.openalexId)}"
+           th:href="@{${paper.openalexId}}"
+           target="_blank"
+           style="display: inline-flex; align-items: center; padding: 6px 12px; background: #7c3aed; color: white; 
+                  text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600; transition: background 0.2s;">
+          🌐 OpenAlex
+        </a>
+      </div>
+    </div>
 
     <h3>🧾 Summary</h3>
     <!-- <div class="summary-content"

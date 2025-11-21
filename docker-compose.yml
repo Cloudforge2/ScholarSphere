@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   neo4j:
-    platform : linux/amd64
+    # Removed platform constraint - supports both ARM64 (Mac) and AMD64 (Linux/Windows)
     image: neo4j:5.23
     container_name: neo4j-scrappy
     restart: unless-stopped
@@ -20,7 +20,7 @@ services:
       retries: 10
 
   mysql:
-    platform : linux/amd64
+    # Removed platform constraint - supports both ARM64 (Mac) and AMD64 (Linux/Windows)
     image: mysql:8.0
     container_name: scholarsphere-mysql
     restart: unless-stopped
@@ -40,7 +40,7 @@ services:
       retries: 10
 
   scrappy:
-    platform : linux/amd64
+    # Removed platform constraint - Go builds support multi-architecture
     build: ./Scrappy-service
     container_name: scrappy
     restart: unless-stopped
@@ -57,7 +57,7 @@ services:
       - scholarsphere-net
 
   graph-service:
-    platform : linux/amd64
+    # Removed platform constraint - Java/Maven supports multi-architecture
     build: ./Graph-service
     container_name: graph
     restart: unless-stopped
@@ -77,7 +77,7 @@ services:
 
 
   frontend-service:
-    platform : linux/amd64
+    # Removed platform constraint - Java/Maven supports multi-architecture
     build: ./Frontend-service
     container_name: scholarsphere-frontend
     restart: unless-stopped
@@ -97,7 +97,7 @@ services:
       - scholarsphere-net
   
   summary-service:
-    platform : linux/amd64
+    # Removed platform constraint - Python supports multi-architecture
     build:
       context: ./Summary-service 
     container_name: summary-service
