@@ -1,0 +1,73 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.env
+**/.env
+**/.env.local
+
+# Sensitive configuration files
+**/application-local.properties
+**/application-local.yml
+secrets/
+*.key
+*.pem
+*.crt
+*.p12
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+**/target/
+**/build/
+**/dist/
+**/out/
+
+# Maven
+**/mvnw
+**/mvnw.cmd
+**/.mvn/
+
+# Go
+**/vendor/
+**/*.exe
+**/*.dll
+**/*.so
+**/*.dylib
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/*.pyd
+.Python
+**/*.so
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+**/*.egg-info/
+**/dist/
+**/build/
+**/*.egg
+
+# Logs
+*.log
+**/logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+**/docker-compose.override.yml
+
+# OS generated files
+Thumbs.db
+.DS_Store

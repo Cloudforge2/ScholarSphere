@@ -1,0 +1,103 @@
+name: ScholarSphere Code Quality & Security Scan
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  analyze:
+    name: Lint, Test, and Scan ScholarSphere
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      ##################################################
+      # === PYTHON BACKEND CHECKS (e.g. API, summarizer)
+      ##################################################
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pylint bandit semgrep
+
+      - name: Python Linting (Pylint)
+        run: |
+          echo "Running Pylint..."
+          pylint $(git ls-files '*.py') || true
+
+      - name: Python Security Scan (Bandit)
+        run: |
+          echo "Running Bandit..."
+          bandit -r . -ll --skip B101,B110,B404,B603 || true
+
+      - name: Python Static Analysis (Semgrep)
+        run: |
+          echo "Running Semgrep on Python files..."
+          semgrep --config auto --lang=python --error || true
+
+      - name: Python Tests (pytest)
+        run: |
+          echo "Running pytest..."
+          pytest -q || true
+
+      ##################################################
+      # === JAVA BACKEND + THYMELEAF FRONTEND CHECKS
+      ##################################################
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17' # or 21 if your project uses newer LTS
+
+      - name: Build with Maven (skip tests initially)
+        run: |
+          echo "Building Java/Thymeleaf backend..."
+          mvn -B clean install -DskipTests
+
+      - name: Run Java Unit Tests
+        run: |
+          echo "Running Java tests..."
+          mvn -B test
+
+      - name: Run SpotBugs (Java static analysis)
+        run: |
+          echo "Running SpotBugs..."
+          mvn com.github.spotbugs:spotbugs-maven-plugin:check || true
+
+      - name: Check for Vulnerable Dependencies (OWASP Dependency Check)
+        run: |
+          echo "Running OWASP Dependency Check..."
+          mvn org.owasp:dependency-check-maven:check || true
+
+      ##################################################
+      # === SECURITY & STATIC CHECKS ACROSS LANGUAGES
+      ##################################################
+      - name: Global Static Analysis (Semgrep Multi-Language)
+        run: |
+          echo "Running Semgrep across Java and Python..."
+          semgrep --config p/ci --error || true
+
+      ##################################################
+      # === ARTIFACTS AND REPORTS
+      ##################################################
+      - name: Upload Reports (Artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: scholar-quality-reports
+          path: |
+            **/target/spotbugsXml.xml
+            **/dependency-check-report.html
+            **/pytest*.xml
+            **/bandit*.json
+            **/semgrep*.json
+          if-no-files-found: ignore
+

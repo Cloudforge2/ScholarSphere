@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>Coauthor Graph - ScholarSphere</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Roboto', sans-serif;
+      background: #f9fafb;
+    }
+    header {
+      background-color: #9333ea;
+      color: white;
+      padding: 20px 40px;
+      font-size: 24px;
+      font-weight: 600;
+      text-align: center;
+    }
+    #graph-container {
+      width: 90%;
+      height: calc(100vh - 180px);
+      margin: 20px auto;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+    #legend {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .legend-item {
+      display: inline-block;
+      padding: 6px 12px;
+      margin: 5px;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+    }
+    .prof {
+      background: #2563eb;
+    }
+    .coauthor {
+      background: #9333ea;
+    }
+    #pagination-controls {
+      text-align: center;
+      margin: 20px;
+    }
+    .nav-btn {
+      background: #9333ea;
+      color: white;
+      font-weight: bold;
+      padding: 10px 25px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: 0.2s ease;
+      margin: 0 10px;
+    }
+    .nav-btn:hover {
+      background: #7e22ce;
+    }
+    .nav-btn:disabled {
+      background: #d1d5db;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body>
+
+  <header style="display:flex; justify-content:space-between; align-items:center;">
+    
+    <!-- LEFT: Page title -->
+    <div>
+      👥 Coauthor Network Visualization
+    </div>
+  
+    <!-- RIGHT: New Search button -->
+    <button onclick="window.location.href='/main'"
+            style="background:white; color:#2563eb; border:none;
+                   padding:8px 15px; border-radius:8px;
+                   font-weight:600; cursor:pointer;">
+        New Search
+    </button>
+  </header>
+
+
+  <div id="legend">
+    <span class="legend-item prof">Professor</span>
+    <span class="legend-item coauthor">Coauthor</span>
+  </div>
+
+  <div id="graph-container"></div>
+
+  <div id="pagination-controls">
+    <button id="prevBtn" class="nav-btn" disabled>⬅ Previous</button>
+    <button id="nextBtn" class="nav-btn">Next ➡</button>
+  </div>
+
+  <script th:inline="javascript">
+  /*<![CDATA[*/
+  document.addEventListener("DOMContentLoaded", function () {
+
+    // Injected JSON from backend
+    let graphData = /*[[${graphJson}]]*/ '{"nodes":[],"edges":[]}';
+    if (typeof graphData === "string") graphData = JSON.parse(graphData);
+    console.log("Graph JSON:", graphData);
+
+    const profNode = graphData.nodes.find(n => n.data.type === "prof");
+    const coauthorNodes = graphData.nodes.filter(n => n.data.type === "coauthor");
+    const edges = graphData.edges;
+
+    const pageSize = 15;
+    let currentPage = 0;
+    const totalPages = Math.ceil(coauthorNodes.length / pageSize);
+
+    const container = document.getElementById("graph-container");
+    let network;
+
+    function renderPage(page) {
+      const start = page * pageSize;
+      const end = Math.min(start + pageSize, coauthorNodes.length);
+      const pageNodes = coauthorNodes.slice(start, end);
+
+      const visibleNodes = [profNode, ...pageNodes];
+      const visibleEdges = edges.filter(e =>
+        visibleNodes.some(n => n.data.id === e.data.source || n.data.id === e.data.target)
+      );
+
+      // Transform to Vis.js format
+      const visNodes = visibleNodes.map(n => ({
+        id: n.data.id,
+        label: n.data.label,
+        shape: "ellipse",
+        type: n.data.type,
+        size: n.data.type === "prof" ? 45 : 30,
+        color: n.data.type === "prof" 
+          ? { background: "#2563eb", border: "#1d4ed8" }
+          : { background: "#9333ea", border: "#7e22ce" },
+        font: {
+          color: "white",
+          size: n.data.type === "prof" ? 16 : 13,
+          face: "Roboto",
+          vadjust: 0
+        }
+      }));
+
+      const visEdges = visibleEdges.map(e => ({
+        from: e.data.source,
+        to: e.data.target,
+        color: { color: "#a3a3a3" },
+        width: 2,
+        smooth: { type: "continuous" }
+      }));
+
+      const data = {
+        nodes: new vis.DataSet(visNodes),
+        edges: new vis.DataSet(visEdges)
+      };
+
+      const options = {
+        layout: { improvedLayout: true },
+        physics: {
+          enabled: true,
+          solver: "forceAtlas2Based",
+          forceAtlas2Based: { gravitationalConstant: -60, springLength: 150 }
+        },
+        interaction: {
+          hover: true,
+          tooltipDelay: 100,
+          zoomView: true,
+          dragNodes: true
+        },
+        nodes: {
+          shadow: true,
+          borderWidth: 2
+        },
+        edges: {
+          shadow: false
+        }
+      };
+
+      // Clear previous network
+      if (network) network.destroy();
+
+      network = new vis.Network(container, data, options);
+
+      // Click event navigation
+       network.on("click", function(params) {
+        if (params.nodes.length > 0) {
+          const nodeId = params.nodes[0];
+          const node = data.nodes.get(nodeId); // Use data.nodes.get() for vis.DataSet
+
+          if (node) {
+            // Redirect based on the node's type
+            if (node.type === "prof") {
+                // Action for the main professor
+                window.location.href = "/professor-summary?id=" + node.id;
+            } else if (node.type === "coauthor") {
+                // Action for a coauthor (assuming they are also professors)
+                window.location.href = "/coauthor-graph?id=" + node.id;
+            }
+          }
+        }
+      });
+      // Update buttons
+      document.getElementById("prevBtn").disabled = page === 0;
+      document.getElementById("nextBtn").disabled = page >= totalPages - 1;
+    }
+
+    // Event Listeners
+    document.getElementById("prevBtn").addEventListener("click", () => {
+      if (currentPage > 0) {
+        currentPage--;
+        renderPage(currentPage);
+      }
+    });
+
+    document.getElementById("nextBtn").addEventListener("click", () => {
+      if (currentPage < totalPages - 1) {
+        currentPage++;
+        renderPage(currentPage);
+      }
+    });
+
+    // Initial Render
+    renderPage(currentPage);
+
+  });
+  /*]]>*/
+  </script>
+</body>
+</html>
