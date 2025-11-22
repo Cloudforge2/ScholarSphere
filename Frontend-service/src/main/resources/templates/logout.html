@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Logout - ScholarSphere</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ---------- Body & Background ---------- */
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: url('/images/technology-3243375_1280.jpg') no-repeat center center fixed;
+            background-size: cover;
+            position: relative;
+        }
+
+        body::before {
+            content: "";
+            position: absolute;
+            top:0; left:0; right:0; bottom:0;
+            background: rgba(0,0,0,0.35);
+            z-index: 0;
+        }
+
+        /* ---------- Card ---------- */
+        .logout-container {
+            position: relative;
+            z-index: 1;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(8px);
+            padding: 60px 40px;
+            border-radius: 20px;
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .logout-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.35);
+        }
+
+        /* ---------- Heading & Text ---------- */
+        .logout-container h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #1f2937;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 1s forwards;
+        }
+
+        .logout-container p {
+            font-size: 15px;
+            color: #4b5563;
+            margin-bottom: 30px;
+            opacity: 0;
+            animation: fadeInUp 1s forwards;
+            animation-delay: 0.3s;
+        }
+
+        /* ---------- Buttons ---------- */
+        .btn-primary, .btn-secondary {
+            display: inline-block;
+            width: 100%;
+            border-radius: 12px;
+            padding: 12px 0;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 1s forwards;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg,#2563eb,#3b82f6);
+            color: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            animation-delay: 0.6s;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(90deg,#1e40af,#2563eb);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #1f2937;
+            margin-top: 15px;
+            animation-delay: 0.9s;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+            transform: translateY(-2px);
+        }
+
+        /* ---------- Animation ---------- */
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ---------- Responsive ---------- */
+        @media (max-width: 600px) {
+            .logout-container {
+                padding: 40px 20px;
+            }
+            .logout-container h2 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="logout-container">
+        <h2>Logout</h2>
+        <p>You are about to log out from ScholarSphere. Are you sure?</p>
+
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="btn-primary">Yes, Logout</button>
+        </form>
+
+        <a th:href="@{/main}">
+            <button class="btn-secondary">Cancel</button>
+        </a>
+    </div>
+
+</body>
+</html>
