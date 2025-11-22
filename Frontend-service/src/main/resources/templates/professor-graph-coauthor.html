@@ -75,29 +75,54 @@
 </head>
 <body>
 
-  <header style="display:flex; justify-content:space-between; align-items:center;">
-    
-    <!-- LEFT: Page title -->
-    <div>
-      👥 Coauthor Network Visualization
+  <header style="
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:15px 40px;
+    background-color:#2563eb;
+    color:white;
+    position:sticky;
+    top:0;
+    z-index:100;
+">
+
+    <!-- LEFT SIDE: Page title -->
+    <div style="font-size:20px; font-weight:600;">
+        Select Author
     </div>
-  
-    <!-- RIGHT: New Search button -->
-    <button onclick="window.location.href='/main'"
-            style="background:white; color:#2563eb; border:none;
-                   padding:8px 15px; border-radius:8px;
-                   font-weight:600; cursor:pointer;">
-        New Search
-    </button>
-  </header>
 
+    <!-- RIGHT SIDE: All 3 buttons -->
+    <div style="display:flex; align-items:center; gap:15px;">
 
-  <div th:if="${error}"
-     style="background:#fee2e2; color:#b91c1c; padding:12px;
-            border-radius:8px; margin:15px auto; width:80%;
-            text-align:center; font-weight:600;">
-    <span th:text="${error}"></span>
-</div>
+        <!-- New Search -->
+        <button onclick="window.location.href='/main'"
+                style="background:white; color:#2563eb; border:none;
+                       padding:8px 15px; border-radius:8px;
+                       font-weight:600; cursor:pointer;">
+            New Search
+        </button>
+
+        <!-- Change Password -->
+        <button onclick="window.location.href='/change-password'"
+                style="background:white; color:#2563eb; border:none;
+                       padding:8px 15px; border-radius:8px;
+                       font-weight:600; cursor:pointer;">
+            Change Password
+        </button>
+
+        <!-- Logout -->
+        <button onclick="window.location.href='/logout-confirm'"
+                style="background:#ef4444; color:white; border:none;
+                       padding:8px 15px; border-radius:8px;
+                       font-weight:600; cursor:pointer;">
+            Logout
+        </button>
+
+    </div>
+
+</header>
+
 
   <div id="legend">
     <span class="legend-item prof">Professor</span>
@@ -106,11 +131,10 @@
 
   <div id="graph-container"></div>
 
-  <div id="pagination-controls" style="text-align:center; margin:20px;">
-    <button id="prevBtn" class="nav-btn">⬅ Prev</button>
+  <div id="pagination-controls">
+    <button id="prevBtn" class="nav-btn" disabled>⬅ Previous</button>
     <button id="nextBtn" class="nav-btn">Next ➡</button>
-    <span id="pageInfo" style="margin-left:12px; font-size:15px; color:#374151; font-weight:600;"></span>
-</div>
+  </div>
 
   <script th:inline="javascript">
   /*<![CDATA[*/
@@ -207,17 +231,20 @@
           const node = data.nodes.get(nodeId); // Use data.nodes.get() for vis.DataSet
 
           if (node) {
-            // Redirect to professor summary for both prof and coauthor
-            // This prevents nested graph creation and directly shows coauthor details
-            window.location.href = "/professor-summary?id=" + node.id;
+            // Redirect based on the node's type
+            if (node.type === "prof") {
+                // Action for the main professor
+                window.location.href = "/professor-summary?id=" + node.id;
+            } else if (node.type === "coauthor") {
+                // Action for a coauthor (assuming they are also professors)
+                window.location.href = "/coauthor-graph?id=" + node.id;
+            }
           }
         }
       });
       // Update buttons
       document.getElementById("prevBtn").disabled = page === 0;
       document.getElementById("nextBtn").disabled = page >= totalPages - 1;
-      document.getElementById("pageInfo").textContent =`Page ${page + 1} of ${totalPages}`;
-
     }
 
     // Event Listeners
