@@ -22,38 +22,43 @@ public class User {
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
+    // ⭐ NEW FIELDS FOR SECURITY QUESTION + ANSWER
+    @Column(nullable = false)
+    private String securityQuestion;
+
+    @Column(nullable = false)
+    private String securityAnswer;
+
     // Constructors
     public User() {}
 
-    public User(String username, String password) {
+    public User(String username, String password, String securityQuestion, String securityAnswer) {
         this.username = username;
         this.password = password;
+        this.securityQuestion = securityQuestion;
+        this.securityAnswer = securityAnswer;
     }
 
     // Getters and Setters
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public void setId(Long id) { this.id = id; }
 
-    public String getUsername() {
-        return username;
-    }
+    public String getUsername() { return username; }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
+    public void setUsername(String username) { this.username = username; }
 
-    public String getPassword() {
-        return password;
-    }
+    public String getPassword() { return password; }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
+    public void setPassword(String password) { this.password = password; }
+
+    public String getSecurityQuestion() { return securityQuestion; }
+
+    public void setSecurityQuestion(String securityQuestion) { this.securityQuestion = securityQuestion; }
+
+    public String getSecurityAnswer() { return securityAnswer; }
+
+    public void setSecurityAnswer(String securityAnswer) { this.securityAnswer = securityAnswer; }
 
     // Equals and HashCode
     @Override
