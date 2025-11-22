@@ -54,28 +54,53 @@
 </head>
 <body>
 
-<header style="display:flex; justify-content:space-between; align-items:center;">
-    
-  <!-- LEFT: Page title -->
-  <div>
-    Research Topics for <span th:text="${professorName}"></span>
-  </div>
+<header style="
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:15px 40px;
+    background-color:#2563eb;
+    color:white;
+    position:sticky;
+    top:0;
+    z-index:100;
+">
 
-  <!-- RIGHT: New Search button -->
-  <button onclick="window.location.href='/main'"
-          style="background:white; color:#2563eb; border:none;
-                 padding:8px 15px; border-radius:8px;
-                 font-weight:600; cursor:pointer;">
-      New Search
-  </button>
+    <!-- LEFT SIDE: Page title -->
+    <div style="font-size:20px; font-weight:600;">
+        Select Author
+    </div>
+
+    <!-- RIGHT SIDE: All 3 buttons -->
+    <div style="display:flex; align-items:center; gap:15px;">
+
+        <!-- New Search -->
+        <button onclick="window.location.href='/main'"
+                style="background:white; color:#2563eb; border:none;
+                       padding:8px 15px; border-radius:8px;
+                       font-weight:600; cursor:pointer;">
+            New Search
+        </button>
+
+        <!-- Change Password -->
+        <button onclick="window.location.href='/change-password'"
+                style="background:white; color:#2563eb; border:none;
+                       padding:8px 15px; border-radius:8px;
+                       font-weight:600; cursor:pointer;">
+            Change Password
+        </button>
+
+        <!-- Logout -->
+        <button onclick="window.location.href='/logout-confirm'"
+                style="background:#ef4444; color:white; border:none;
+                       padding:8px 15px; border-radius:8px;
+                       font-weight:600; cursor:pointer;">
+            Logout
+        </button>
+
+    </div>
+
 </header>
-
-<div th:if="${error}"
-     style="background:#fee2e2; color:#b91c1c; padding:12px;
-            border-radius:8px; margin:15px auto; width:80%;
-            text-align:center; font-weight:600;">
-    <span th:text="${error}"></span>
-</div>
 
 <div id="graph-container"></div>
 
