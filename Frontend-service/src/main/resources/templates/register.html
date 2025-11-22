@@ -40,11 +40,6 @@
             transition: transform 0.3s, box-shadow 0.3s;
         }
 
-        .register-container:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.35);
-        }
-
         .register-container h2 {
             font-size: 28px;
             font-weight: 700;
@@ -53,7 +48,6 @@
             opacity: 0;
             transform: translateY(20px);
             animation: fadeInUp 1s forwards;
-            animation-delay: 0s;
         }
 
         .register-container p {
@@ -63,7 +57,7 @@
             opacity: 0;
             transform: translateY(20px);
             animation: fadeInUp 1s forwards;
-            animation-delay: 0.3s;
+            animation-delay: .2s;
         }
 
         .form-control {
@@ -73,11 +67,10 @@
             padding: 12px 15px;
             font-size: 14px;
             width: 100%;
-            transition: border-color 0.3s, box-shadow 0.3s;
             opacity: 0;
             transform: translateY(20px);
             animation: fadeInUp 1s forwards;
-            animation-delay: 0.6s;
+            animation-delay: .4s;
         }
 
         .form-control:focus {
@@ -87,7 +80,6 @@
         }
 
         .btn-primary {
-            display: inline-block;
             width: 100%;
             background: linear-gradient(90deg,#2563eb,#3b82f6);
             color: white;
@@ -97,12 +89,10 @@
             font-weight: 500;
             border-radius: 12px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             opacity: 0;
             transform: translateY(20px);
             animation: fadeInUp 1s forwards;
-            animation-delay: 0.9s;
+            animation-delay: .6s;
         }
 
         .btn-primary:hover {
@@ -118,7 +108,7 @@
             opacity: 0;
             transform: translateY(20px);
             animation: fadeInUp 1s forwards;
-            animation-delay: 1.2s;
+            animation-delay: .8s;
         }
 
         .login-link a {
@@ -127,60 +117,57 @@
             font-weight: 500;
         }
 
-        .login-link a:hover {
-            text-decoration: underline;
-        }
-
-        .error-message {
-            color: red;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-
-        .success-message {
-            color: green;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
+        .error-message { color: red; margin-bottom: 10px; }
+        .success-message { color: green; margin-bottom: 10px; }
 
         @keyframes fadeInUp {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @media (max-width: 600px) {
-            .register-container {
-                padding: 40px 20px;
-            }
-
-            .register-container h2 {
-                font-size: 24px;
-            }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
     <div class="register-container">
         <h2>Create an Account</h2>
-        <p>Join ScholarSphere for graphical exploration and AI summarization for researchers.</p>
+        <p>Join ScholarSphere for graphical exploration and AI summarization.</p>
 
+        <!-- Messages -->
         <div th:if="${error}" class="error-message" th:text="${error}"></div>
         <div th:if="${message}" class="success-message" th:text="${message}"></div>
 
         <form th:action="@{/register}" method="post">
-            <!-- IISc email validation -->
-            <input type="email" name="username" class="form-control" placeholder="Your IISc Email" 
-                   required pattern="^[A-Za-z0-9._%+-]+@iisc\.ac\.in$"
-                   oninvalid="this.setCustomValidity('Enter a valid IISc email')"
-                   oninput="this.setCustomValidity('')"/>
-            <input type="password" name="password" class="form-control" placeholder="Password" required/>
+
+            <!-- IISc Email -->
+            <input type="email" name="username" class="form-control"
+                placeholder="Your IISc Email"
+                required
+                pattern="^[A-Za-z0-9._%+-]+@iisc\.ac\.in$"
+                oninvalid="this.setCustomValidity('Enter a valid IISc email')"
+                oninput="this.setCustomValidity('')"/>
+
+            <!-- Password -->
+            <input type="password" name="password" class="form-control"
+                   placeholder="Password" required/>
+
+            <!-- 🔐 SECURITY QUESTION -->
+            <select name="securityQuestion" class="form-control" required>
+                <option value="" disabled selected>Select a Security Question</option>
+                <option>What is your childhood nickname?</option>
+                <option>What is the name of your first school?</option>
+                <option>What is your best friend's name?</option>
+                <option>What is your favorite teacher's name?</option>
+            </select>
+
+            <!-- SECURITY ANSWER -->
+            <input type="text" name="securityAnswer" class="form-control"
+                   placeholder="Your Answer" required/>
+
+            <!-- Submit -->
             <button type="submit" class="btn-primary">Register</button>
         </form>
 
         <div class="login-link">
-            Already have an account? <a th:href="@{/login}">Login</a>
+            Already have an account?
+            <a th:href="@{/login}">Login</a>
         </div>
     </div>
 </body>
