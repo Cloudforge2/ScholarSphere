@@ -24,15 +24,33 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // Public pages (allow access to graph pages)
-                .requestMatchers("/", "/index", "/index.html", "/css/**", "/js/**", "/images/**",
-                                 "/login", "/register",
-                                 "/professor-graph", "/professor-summary", "/paper-summary").permitAll()
+                .requestMatchers(
+                        "/", "/index", "/index.html",
+                        "/css/**", "/js/**", "/images/**",
+
+                        // Login + Register
+                        "/login", "/register",
+
+                        // Forgot / Reset Password (public)
+                        "/forgot-password",
+                        "/forgot-password-question",   // ⭐ MISSING EARLIER
+                        "/reset-password",
+
+                        // Logout confirmation + post-logout
+                        "/logout-confirm", "/logout-success",
+
+                        // Public graph pages
+                        "/professor-graph", "/professor-summary", "/paper-summary"
+                )
+                .permitAll()
+
                 // Authenticated pages
-                .requestMatchers("/main").authenticated()
+                .requestMatchers("/main", "/change-password").authenticated()
+
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
@@ -43,7 +61,10 @@ public class SecurityConfig {
                 .permitAll()
             )
             .logout(logout -> logout
-                .logoutSuccessUrl("/index")
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/logout-success")
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
                 .permitAll()
             );
 
