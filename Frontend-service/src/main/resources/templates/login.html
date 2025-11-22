@@ -108,7 +108,7 @@
             opacity: 0;
             transform: translateY(20px);
             animation: fadeInUp 1s forwards;
-            animation-delay: 0.9s;
+            animation-delay: 1.2s;
         }
 
         .btn-primary:hover {
@@ -125,7 +125,7 @@
             opacity: 0;
             transform: translateY(20px);
             animation: fadeInUp 1s forwards;
-            animation-delay: 1.2s;
+            animation-delay: 1.4s;
         }
 
         .register-link a {
@@ -153,25 +153,12 @@
 
         /* ---------- Fade-in Animation ---------- */
         @keyframes fadeInUp {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* ---------- Responsive ---------- */
-        @media (max-width: 600px) {
-            .login-container {
-                padding: 40px 20px;
-            }
-
-            .login-container h2 {
-                font-size: 24px;
-            }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
+
     <div class="login-container">
         <h2>Login</h2>
         <p>Access ScholarSphere for graphical exploration and AI summarization for researchers.</p>
@@ -183,6 +170,17 @@
         <form th:action="@{/login}" method="post">
             <input type="text" name="username" class="form-control" placeholder="Username" required/>
             <input type="password" name="password" class="form-control" placeholder="Password" required/>
+
+            <!-- 🔥 Added Forgot Password Link -->
+            <div style="text-align:right; margin-bottom: 20px;
+                        opacity: 0; transform: translateY(20px);
+                        animation: fadeInUp 1s forwards; animation-delay: 0.9s;">
+                <a th:href="@{/forgot-password}"
+                   style="font-size: 14px; color:#2563eb; text-decoration:none; font-weight:500;">
+                    Forgot Password?
+                </a>
+            </div>
+
             <button type="submit" class="btn-primary">Login</button>
         </form>
 
@@ -190,5 +188,6 @@
             Don’t have an account? <a th:href="@{/register}">Register</a>
         </div>
     </div>
+
 </body>
 </html>
