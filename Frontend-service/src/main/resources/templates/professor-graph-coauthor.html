@@ -89,7 +89,7 @@
 
     <!-- LEFT SIDE: Page title -->
     <div style="font-size:20px; font-weight:600;">
-        Select Author
+      👥 Coauthor Network Visualization
     </div>
 
     <!-- RIGHT SIDE: All 3 buttons -->
@@ -124,6 +124,14 @@
 </header>
 
 
+  <div th:if="${error}"
+  style="background:#fee2e2; color:#b91c1c; padding:12px;
+        border-radius:8px; margin:15px auto; width:80%;
+        text-align:center; font-weight:600;">
+  <span th:text="${error}"></span>
+  </div>
+
+
   <div id="legend">
     <span class="legend-item prof">Professor</span>
     <span class="legend-item coauthor">Coauthor</span>
@@ -131,9 +139,11 @@
 
   <div id="graph-container"></div>
 
-  <div id="pagination-controls">
-    <button id="prevBtn" class="nav-btn" disabled>⬅ Previous</button>
+  
+    <div id="pagination-controls" style="text-align:center; margin:20px;">
+      <button id="prevBtn" class="nav-btn">⬅ Prev</button>
     <button id="nextBtn" class="nav-btn">Next ➡</button>
+    <span id="pageInfo" style="margin-left:12px; font-size:15px; color:#374151; font-weight:600;"></span>
   </div>
 
   <script th:inline="javascript">
@@ -245,6 +255,7 @@
       // Update buttons
       document.getElementById("prevBtn").disabled = page === 0;
       document.getElementById("nextBtn").disabled = page >= totalPages - 1;
+      document.getElementById("pageInfo").textContent =`Page ${page + 1} of ${totalPages}`;
     }
 
     // Event Listeners

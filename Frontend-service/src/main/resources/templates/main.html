@@ -82,6 +82,17 @@
     </style>
 </head>
 <body>
+
+    <div th:if="${error}"
+        style="background:#fee2e2; color:#b91c1c; padding:14px 20px;
+            border-radius:12px; margin-bottom:25px;
+            position:absolute; top:30px; left:50%; transform:translateX(-50%);
+            width:auto; max-width:80%;
+            box-shadow:0 4px 12px rgba(0,0,0,0.15);
+            font-weight:600; font-size:16px; text-align:center;">
+    <span th:text="${error}"></span>
+    </div>
+
     <div class="search-box">
         <h1>ScholarSphere</h1>
         <form th:action="@{/search}" method="get">

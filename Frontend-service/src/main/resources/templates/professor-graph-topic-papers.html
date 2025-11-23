@@ -102,7 +102,7 @@
 
     <!-- LEFT SIDE: Page title -->
     <div style="font-size:20px; font-weight:600;">
-        Select Author
+        <span th:text="${pageTitle}"></span> — <span th:text="${professorName}"></span>
     </div>
 
     <!-- RIGHT SIDE: All 3 buttons -->
@@ -137,12 +137,20 @@
 </header>
 <a href="javascript:history.back()" class="back-button">← Back to Research Domains</a>
 
+
+<div th:if="${error}"
+     style="background:#fee2e2; color:#b91c1c; padding:12px;
+            border-radius:8px; margin:15px auto; width:80%;
+            text-align:center; font-weight:600;">
+    <span th:text="${error}"></span>
+</div>
+
 <div id="graph-container"></div>
 
-<div class="pagination-container">
-    <button id="prevBtn" class="pagination-btn" disabled>Previous</button>
-    <button id="nextBtn" class="pagination-btn">Next</button>
-    <div id="pageInfo"></div>
+<div id="pagination-controls" style="text-align:center; margin-bottom:25px;">
+    <button id="prevBtn" class="pagination-btn">⬅ Prev</button>
+    <button id="nextBtn" class="pagination-btn">Next ➡</button>
+    <span id="pageInfo" style="margin-left:10px; font-size:15px; color:#374151; font-weight:600;"></span>
 </div>
 
 <script th:inline="javascript">
