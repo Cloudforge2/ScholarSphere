@@ -249,35 +249,28 @@ def generate_with_openai(prompt: str, model: str = None, max_tokens: int = 1024,
     """Call OpenAI API (gpt-4o-mini by default) as a fallback if Groq fails."""
     model = model or OPENAI_MODEL
     try:
-        import openai
+        from openai import OpenAI
         openai_api_key = os.environ.get("OPENAI_API_KEY")
         if not openai_api_key:
             raise RuntimeError("OPENAI_API_KEY environment variable not set")
-        openai.api_key = openai_api_key
-
-        # Use ChatCompletion for broad compatibility
-        response = openai.ChatCompletion.create(
+        
+        # Use the new OpenAI v1.0+ client syntax
+        client = OpenAI(api_key=openai_api_key)
+        
+        response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
             temperature=temperature,
         )
-        # Extract content robustly
-        choices = response.get("choices", [])
-        if choices:
-            first = choices[0]
-            msg = first.get("message") or first
-            if isinstance(msg, dict):
-                content = msg.get("content") or msg.get("text")
-                if content:
-                    return content.strip()
-            text = first.get("text")
-            if text:
-                return text.strip()
-        # fallback to response text
-        if isinstance(response.get("usage"), dict) or isinstance(response, dict):
-            # if nothing else, stringify
-            return json.dumps(response)
+        
+        # Extract content from the new response format
+        if response.choices and len(response.choices) > 0:
+            content = response.choices[0].message.content
+            if content:
+                return content.strip()
+        
+        return ""
     except Exception as e:
         print(f"⚠️  OpenAI call failed: {e}")
     return ""
