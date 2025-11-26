@@ -102,7 +102,7 @@
 
     <!-- LEFT -->
     <div style="font-size:20px; font-weight:600;">
-        Professor Graph Visualization
+        <span th:text="${pageTitle}"></span> — <span th:text="${professorName}"></span>
     </div>
 
     <!-- RIGHT -->
@@ -127,13 +127,13 @@
         </a>
 
         <!-- 🧠 TOPIC GRAPH -->
-        <a th:href="@{/topic-graph(id=${profId}, name=${professorName})}">
+        <!-- <a th:href="@{/topic-graph(id=${profId}, name=${professorName})}">
             <button style="background:white; color:#2563eb; border:none;
                            padding:8px 15px; border-radius:8px;
                            font-weight:600; cursor:pointer;">
                 Topic Graph
             </button>
-        </a>
+        </a> -->
 
         <!-- 🔍 New Search -->
         <a th:href="@{/main}">

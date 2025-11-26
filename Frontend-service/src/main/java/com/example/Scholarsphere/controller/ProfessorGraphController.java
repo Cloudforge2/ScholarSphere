@@ -348,7 +348,7 @@ public String paperSummary(@RequestParam(required = false) String title,
         } else {
             throw new IllegalArgumentException("Either 'title' or 'id' parameter is required.");
         }
-
+        
         // 2️⃣ Fetch paper summary from Summary Service (FastAPI)
         String summaryText = "";
         try {

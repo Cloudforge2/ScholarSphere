@@ -2,7 +2,6 @@ Scholar-Sphere — Installation & Architecture Guide
 
 
 
-
 # 1. Overview
 
 Scholar-Sphere is a microservices-based research analytics platform that aggregates academic data, generates graph-based relationships, and produces AI-generated summaries of authors and papers.
@@ -78,22 +77,19 @@ Scholar-sphere-latest/
                └──────────────┬─────────────┘
                               │
                               ▼
-               ┌─────────────────────────────┐
-               │     Summarization Service   |
-               │  FastAPI + LLM (Groq/OpenAI)|
-               └──────────────┬──────────────┘
-                              │
-                              ▼
-               ┌─────────────────────────────┐
-               │       Neo4j Database        │
+               ┌─────────────────────────────┐           
+               │       Neo4j Database        │        
                │  (authors, papers, summary) │
                └─────────────────────────────┘
-                              ▲
-                              │
-               ┌─────────────────────────────┐
-               │       Scrappy Service       │
-               │ go lang service for OpenAlex│
-               └─────────────────────────────┘
+                              ▲             ▲
+                              │             |
+┌─────────────────────────────┐           ┌─────────────────────────────┐
+│       Scrappy Service       │           |   Summarization Service     |
+│ go lang service for OpenAlex│           │  FastAPI + LLM (Groq/OpenAI)|
+└─────────────────────────────┘           └──────────────┬──────────────┘
+               
+               
+               
 
 ```
 
@@ -117,12 +113,36 @@ Before installation, ensure you have:
 ```
   git clone https://github.com/Cloudforge2/ScholarSphere.git
   
-  cd ScholarSphere/Scholar-sphere-latest
+  cd ScholarSphere
+```
+
+**Step 2 - Env variables setup**
+
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your actual credentials
+nano .env  # or use your preferred editor
+
+# Configure Your `.env` File
+
+```env
+# MySQL Configuration
+MYSQL_ROOT_PASSWORD=your_strong_root_password_here
+MYSQL_DATABASE=scholarsphere_db
+MYSQL_USER=scholar_user
+MYSQL_PASSWORD=your_strong_mysql_password_here
+
+# Neo4j Configuration
+NEO4J_PASSWORD=your_strong_neo4j_password_here
+
+# API Keys (get these from respective platforms)
+GROQ_API_KEY=your_actual_groq_api_key_here
+OPENAI_API_KEY=your_actual_openai_api_key_here
 ```
 
 
-
-**Step 2 - Build and Start All Containers**
+**Step 3 - Build and Start All Containers**
 
 From the root project directory:
 ```
@@ -139,7 +159,7 @@ This will start:
 | **frontend-service** | Web UI | 8080 |
 | **summary-service** | LLM-powered summarizer | 8085 |
 
-Step 3 - Access points:
+Step 4 - Access points:
 
 | **Component** | **URL** |
 |----------------|----------|
@@ -152,19 +172,19 @@ Step 3 - Access points:
 ```
 Login credentials:
 
-  Neo4j: neo4j / ***REMOVED***
+  Neo4j: neo4j / 
 
-  MySQL: scholar_user / ***REMOVED***
+  MySQL: scholar_user / 
 ```
 
 
 ## 6. Data Flow Summary
 
-Scrappy-Service scrapes metadata from OpenAlex  and populates Neo4j.
+Scrappy-Service scrapes metadata from OpenAlex and populates Neo4j.
 
 Graph-Service exposes this graph through Spring Boot REST APIs.
 
-Frontend-Service fetches data (authors, papers) and visualizes via Cytoscape.
+Frontend-Service fetches data (authors, papers) and visualizes via Vis Network.
 
 Summary-Service:
 
@@ -215,9 +235,9 @@ The schema models authors, their institutional affiliations, research fields, an
 
 | **Node Label** | **Purpose** | **Key Properties** |
 |----------------|--------------|---------------------|
-| **Author** | Represents an individual researcher | `id, displayName, displayNameAlternatives, orcid, worksCount, citedByCount, fullyIngested, lastFetched, updatedDate, researchSummary, publicationStatistics, collaborationPatterns, papersAnalyzedCount, papersSampleJson, lastUpdated` |
-| **Institution** | Represents a university or research organization | `id, displayName, location, score, institutionIds` |
-| **Work** | Represents an academic publication or paper | `id, title, doi, publicationYear, publicationDate, isRetracted, isOa, pdfUrl, citedByCount` |
+| **Author** | Represents an individual researcher | `iid, displayName, displayNameAlternatives, orcid, worksCount, citedByCount, fullyIngested, lastFetched, updatedDate, lastUpdated, researchSummary, papersAnalyzedCount, papersSampleJson` |
+| **Institution** | Represents a university or research organization | `id, displayName, score, institutionIds` |
+| **Work** | Represents an academic publication or paper | `id, title, doi, publicationYear, publicationDate, isRetracted, isOa, pdfUrl, citedByCount ,summary, summaryLastUpdated, infoJson` |
 | **Domain** | High-level research area (e.g., Computer Science, Physics) | `id, displayName, score` |
 | **Field** | Subdivision of a domain (e.g., Software Engineering, Machine Learning) | `id, displayName, score` |
 | **Subfield** | Finer-grained category within a field | `id, displayName, score` |
@@ -263,31 +283,46 @@ Get All Authors with Summaries
 ```
   MATCH (a:Author)
   WHERE a.researchSummary IS NOT NULL
-  RETURN a.displayName AS name, a.worksCount AS works, a.citedByCount AS citations
-  ORDER BY citations DESC LIMIT 10;
+  RETURN a.displayName AS name,
+        a.worksCount AS works,
+        a.citedByCount AS citations
+  ORDER BY citations DESC
+  LIMIT 10;
+
 ```
 List All Works by an Author
 ```
-  MATCH (a:Author {id: ")
-  RETURN w.title AS title, w.publicationYear AS year, w.citedByCount AS citations
+  MATCH (a:Author {id: $id})-[:AUTHORED]->(w:Work)
+  RETURN w.title AS title,
+        w.publicationYear AS year,
+        w.citedByCount AS citations
   ORDER BY year DESC;
+
 ```
 Author’s Affiliations
 ```
-  MATCH (a:Author {id: ")
+  MATCH (a:Author {id: $id})-[:AFFILIATED_WITH]->(i:Institution)
   RETURN i.displayName AS institution;
+
 ```
 Topics Linked to an Author
 ```
-  MATCH (a:Author {id: ")
-  RETURN t.displayName AS topic, t.score ORDER BY t.score DESC LIMIT 10;
+  MATCH (a:Author {id: $id})-[:HAS_TOPIC]->(t:Topic)
+  RETURN t.displayName AS topic,
+        t.score AS score
+  ORDER BY score DESC
+  LIMIT 10;
+
 ```
 Co-Authors via Shared Papers
 ```
-  MATCH (a1:Author {id: ")
+  MATCH (a1:Author {id: $id})-[:AUTHORED]->(w:Work)<-[:AUTHORED]-(a2:Author)
   WHERE a1 <> a2
-  RETURN DISTINCT a2.displayName AS coauthor, count(w) AS shared_papers
-  ORDER BY shared_papers DESC LIMIT 10;
+  RETURN a2.displayName AS coauthor,
+        count(w) AS shared_papers
+  ORDER BY shared_papers DESC
+  LIMIT 10;
+
 ```
 Domain Hierarchy Example
 ```
@@ -320,7 +355,7 @@ Or, if you want a text-based overview:
 ## Overview
 
 The Graph Service is a Spring Boot–based microservice responsible for interacting with the Neo4j Knowledge Graph.
-It exposes REST endpoints to retrieve and query academic entities — professors, their authored papers, coauthors, topics, and institutional relationships — as a structured graph.
+It exposes REST endpoints to retrieve and query academic entities — professors, their authored papers, coauthors and topics — as a structured graph.
 
 This service acts as the data backbone for Scholar-Sphere, enabling the frontend and summarization services to visualize and analyze research relationships.
 
@@ -346,7 +381,7 @@ Core Responsibilities
 
   Serve as the graph API gateway for visualization in the frontend.
 
-  Decide whether a given author needs to be re-ingested (based on freshness and ingestion flags).
+  Decide whether a given author needs to be re-ingested (based on ingestion flags).
 
 
 
@@ -378,7 +413,7 @@ Data Model
 | **Entity** | **Label** | **Key Properties** |
 |-------------|------------|---------------------|
 | **Professor** | Author | `id, displayName, orcid, worksCount, citedByCount, fullyIngested, lastFetched, updatedDate, lastKnownInstitution` |
-| **Paper** | Work | `id, title, doi, publicationYear (optional)` |
+| **Paper** | Work | `id, title, doi` |
 
 
 
@@ -475,7 +510,7 @@ graph-service:
   environment:
     NEO4J_URI: bolt://neo4j-scrappy:7687
     NEO4J_USERNAME: neo4j
-    NEO4J_PASSWORD: ***REMOVED***
+    NEO4J_PASSWORD: ${NEO4J_PASSWORD}
   ports:
     - "8082:8082"
   depends_on:
@@ -533,7 +568,220 @@ mvn test
 
 ---
 # Scrappy
-documentation is in the scrappy service directory. ty
+# Scrappy - OpenAlex to Neo4j Knowledge Graph Ingestor
+
+A Go-based web service that fetches academic data from the OpenAlex API and populates it into a rich, hierarchical Neo4j graph database.
+
+This application provides a simple API to search for authors and works, ingesting them and their relationships into Neo4j.
+
+## Features
+
+*   **Asynchronous Ingestion:** The main ingestion endpoint (`/api/fetch-author-by-id`) immediately returns a `202 Accepted` response and processes the majority of the author's publications in a background goroutine, preventing HTTP timeouts.
+*   **Rich Graph Model:** Creates a hierarchical graph of `Topics`, `Subfields`, `Fields`, and `Domains` and connects them to both `Author` and `Work` nodes.
+*   **Author Ingestion Flag:** Sets a `fullyIngested: true` property on the `Author` node in Neo4j only after all works (initial batch + background batch) have been processed.
+*   **Comprehensive Data:** Ingests Authors, Works, Institutions, and Venues, creating critical relationships like `AUTHORED`, `PUBLISHED_IN`, and the hierarchical topic relationships.
+*   **API for Discovery & Ingestion:** Separate endpoints for searching/discovery and full ingestion.
+
+## Graph Schema
+
+The service builds the following model in your Neo4j database:
+
+**Nodes:**
+*   `(:Author {id, displayName, fullyIngested})`
+*   `(:Work {id, title, publicationYear, doi})`
+*   `(:Institution {id, displayName})`
+*   `(:Venue {id, displayName})` - A journal or conference.
+*   `(:Topic {id, displayName})`
+*   `(:Subfield {id, displayName})`
+*   `(:Field {id, displayName})`
+*   `(:Domain {id, displayName})`
+
+**Relationships:**
+*   `(:Author)-[:AUTHORED {position, institutionIds}]->(:Work)`
+*   `(:Author)-[:AFFILIATED_WITH]->(:Institution)`
+*   `(:Author)-[:HAS_TOPIC {paperCount}]->(:Topic)`
+*   `(:Work)-[:PUBLISHED_IN]->(:Venue)`
+*   `(:Work)-[:IS_ABOUT_TOPIC {score}]->(:Topic)`
+*   `(:Topic)-[:IN_SUBFIELD]->(:Subfield)`
+*   `(:Subfield)-[:IN_FIELD]->(:Field)`
+*   `(:Field)-[:IN_DOMAIN]->(:Domain)`
+
+## Project Structure
+
+```
+.
+├── cmd/
+│   └── main.go         // Main application entrypoint. Initializes and starts the server.
+├── internal/
+│   ├── api/
+│   │   └── handler.go    // HTTP handlers that control the API logic.
+│   ├── config/
+│   │   └── config.go     // Configuration loader (not provided, assumed).
+│   ├── domain/
+│   │   └── model.go      // Go structs that model the data from OpenAlex.
+│   ├── openalex/
+│   │   └── client.go     // Client for making requests to the OpenAlex API.
+│   └── storage/
+│       └── neo4j.go      // Neo4j repository for all database queries and transactions.
+├── .env                  // (You create this) Local environment variables.
+├── go.mod                // Go module definitions.
+└── README.md             // This file.
+```
+
+## 🚀 Getting Started
+
+
+### Prerequisites
+
+*   **Go:** Version 1.18 or higher.
+*   **Neo4j Database:** A running instance of Neo4j.
+<!-- *   **Git:** For cloning the repository. -->
+
+### Installation & Setup
+
+<!-- 1.  **Clone the Repository**
+    ```sh
+    git clone https://github.com/Cloudforge2/scrappy.git
+    cd scrappy
+    ``` -->
+
+1. **Create a file named `.env` in the root of the project. Fill in your Neo4j database credentials.**
+
+    ```env
+    # .env
+    NEO4J_URI=neo4j://localhost:7687
+    NEO4J_USERNAME=neo4j
+    NEO4J_PASSWORD=your_super_secret_password
+    ```
+
+2.  **Install Dependencies**
+    ```sh
+    go mod tidy
+    ```
+
+3.  **Run the Server**
+    ```sh
+    go run ./cmd/main.go
+    ```
+    You should see the server start on port 8083:
+    ```
+    Successfully connected to Neo4j
+    Starting interactive API server on http://localhost:8083
+    ```
+
+
+## 📚 API Endpoints
+
+The server runs on `http://localhost:8083`.
+
+---
+
+### 1. Find Authors by Name (Discovery)
+
+Finds potential author matches from OpenAlex. This is a read-only endpoint used to discover an author's ID. **It does not save anything to the database.**
+
+*   **Endpoint:** `GET /api/fetch-authors-by-name`
+*   **Query Parameters:**
+    | Parameter | Type   | Description             | Required |
+    | :-------- | :----- | :---------------------- | :------- |
+    | `name`    | string | The name of the author. | Yes      |
+*   **Example Usage:**
+    ```sh
+    curl "http://localhost:8083/api/fetch-authors-by-name?name=Yogesh%20Simmhan"
+    ```
+*   **Success Response (200 OK):** An array of matching authors.
+    ```json
+    [
+      {
+        "id": "https://openalex.org/A5023896336",
+        "displayName": "Yogesh Simmhan",
+        "lastKnownInstitution": "Indian Institute of Science",
+        "citedByCount": 3583,
+        "updatedDate": "2024-07-29T17:15:15.580218",
+        "orcid": "https://orcid.org/0000-0003-0130-3945"
+      }
+    ]
+    ```
+
+---
+
+### 2. Ingest Author and All Works by ID (Asynchronous)
+
+**The primary ingestion endpoint.** Fetches a full Author entity and **all** of their associated Work entities from OpenAlex.
+
+*   **Synchronous Action:** The Author node and an initial batch of works (currently 30) are saved to Neo4j immediately.
+*   **Asynchronous Action:** A background goroutine handles the ingestion of all remaining works.
+*   **Post-Ingestion:** The `Author` node's `fullyIngested` property is set to `true` after the background process completes.
+
+*   **Endpoint:** `GET /api/fetch-author-by-id`
+*   **Query Parameters:**
+    | Parameter | Type   | Description                    | Required |
+    | :-------- | :----- | :----------------------------- | :------- |
+    | `id`      | string | The author's full OpenAlex ID. | Yes      |
+*   **Example Usage:**
+    ```sh
+    curl "http://localhost:8083/api/fetch-author-by-id?id=A5041794289"
+    ```
+*   **Success Response (202 Accepted):** An immediate confirmation that the job has started.
+    ```json
+    {
+      "message": "Request accepted. Initial works are being processed. The rest will be ingested in the background.",
+      "totalWorks": 258,
+      "initialBatchSize": 30
+    }
+    ```
+
+<!-- ---
+
+### 3. Ingest Single Work by Name (Synchronous)
+
+Searches for and ingests the **first** matching Work found by name. This is a synchronous operation.
+
+*   **Action:** Creates the `Work` node, its associated `Author` nodes, `AUTHORED` relationships, `Venue`, and `Topic` hierarchy.
+*   **Endpoint:** `GET /api/fetch-work-by-name`
+*   **Query Parameters:** `name` (string, required) - The title of the work.
+*   **Example Usage:**
+    ```sh
+    curl "http://localhost:8083/api/fetch-work-by-name?name=principia%20mathematica"
+    ```
+*   **Success Response (200 OK):** Confirmation of the successful save.
+
+--- -->
+
+### 3. Get Author's Works (Read-Only)
+
+Fetches the **30 most highly cited** works for a given author from OpenAlex. **Does not save to the database.**
+
+*   **Endpoint:** `GET /api/fetch-recent-works/`
+*   **Query Parameters:** `id` (string, required) - The author's full OpenAlex ID.
+*   **Example Usage:**
+    ```sh
+    curl "http://localhost:8083/api/fetch-recent-works/?id=A5041794289"
+    ```
+*   **Success Response (200 OK):** A JSON array of up to 30 `Work` objects.
+
+
+
+<!-- ### 5. Get Author's Abstract Inverted Indexes (Read-Only)
+
+Fetches abstract data (specifically the `abstract_inverted_index`) for the 30 most highly-cited works by an author, using a custom select query on the OpenAlex API. **Does not save to the database.**
+
+*   **Endpoint:** `GET /api/fetch-abstracts/`
+*   **Query Parameters:** `id` (string, required) - The author's full OpenAlex ID.
+*   **Example Usage:**
+    ```sh
+    curl "http://localhost:8083/api/fetch-abstracts/?id=A5041794289"
+    ```
+*   **Success Response (200 OK):** A JSON array of simplified publication objects containing `title`, `publication_year`, `cited_by_count`, and the raw `abstract_inverted_index`. -->
+
+
+
+## Recommended Workflow
+
+1.  **Discover:** Use `/api/fetch-authors-by-name` to find the correct OpenAlex ID (e.g., `A5041794289`) for the author.
+2.  **Ingest:** Use `/api/fetch-author-by-id?id=A5041794289`. Get the `202 Accepted` response.
+3.  **Monitor:** Check the server logs for the "BACKGROUND SUCCESS" and final "**Author... marked as fully ingested in Neo4j**" messages.
+4.  **Query:** Once ingestion is complete, use a Cypher query like `MATCH (a:Author {id: 'A5041794289'})-[r:AUTHORED]->(w:Work) RETURN a,r,w LIMIT 10` in Neo4j Browser to explore your new knowledge graph.
 
 
 
@@ -562,7 +810,7 @@ This service acts as the presentation layer of Scholar-Sphere, coordinating with
 
   Render interactive graphs (professor, coauthor, topic, and paper networks).
 
-  Fetch and display AI-generated summaries for authors and papers.
+  Fetch and display AI-generated summaries for authors and papers when summary cache is not fresh.
 
   Trigger data ingestion via Scrappy-Service when an author is missing or outdated.
 
@@ -582,7 +830,7 @@ ScholarSphere UI (Spring Boot + Thymeleaf)
 
 Graph Service    Scrappy Service   Summary Service
 
-(Spring Boot + Neo4j)                             (FastAPI + LLM)
+(Spring Boot + Neo4j)              (FastAPI + LLM)
 
 │               │                │
 
@@ -667,14 +915,14 @@ API Type: MVC + REST (via RestTemplate)
 # Docker Integration
 ```
 frontend-service:
-  platform: linux/amd64
+
   build: ./Frontend-service
   container_name: scholarsphere-frontend
   restart: unless-stopped
   environment:
     SPRING_DATASOURCE_URL: jdbc:mysql://scholarsphere-mysql:3306/scholarsphere_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     SPRING_DATASOURCE_USERNAME: scholar_user
-    SPRING_DATASOURCE_PASSWORD: ***REMOVED***
+    SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
   ports:
     - "8080:8080"
   depends_on:
@@ -712,10 +960,6 @@ mvn clean package
 ```
 mvn test
 ```
-
-
-
-
 
 
 
@@ -967,7 +1211,7 @@ Below are screenshots of the main functionalities of our application.
 </p>
 
 
-
+We have SETUP.md describing the initial project setup in brief. We also have SECURITY.md and SECURITY_FIX_SUMMARY.md describing what major changes were made in project to mitigate major security threats.
 
 
 
