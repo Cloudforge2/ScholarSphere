@@ -17,12 +17,15 @@
     header {
       background: linear-gradient(90deg, #0d4f4c, #2563eb);
       color: white;
-      text-align: center;
-      padding: 20px 0;
-      font-size: 24px;
+      padding: 15px 40px;
+      font-size: 20px;
       font-weight: 600;
-      letter-spacing: 0.5px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
     .main-container {
@@ -34,53 +37,54 @@
       box-sizing: border-box;
     }
 
-    /* Left panel */
     .summary-panel {
       background: white;
       border-radius: 18px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.08);
       padding: 25px 30px;
       overflow-y: auto;
     }
 
     .summary-panel h2 {
-      color: #111827;
+      margin-bottom: 5px;
       font-size: 22px;
+    }
+
+    .paper-id {
       margin-bottom: 15px;
+      font-size: 14px;
+      color: #475569;
     }
 
     .summary-panel h3 {
       margin-top: 20px;
-      color: #0d4f4c;
       font-size: 18px;
       border-bottom: 2px solid #e2e8f0;
       padding-bottom: 5px;
+      color: #0d4f4c;
     }
 
-    .summary-content {
-      margin-top: 10px;
-      line-height: 1.7;
+    /* HEADINGS red */
+    .section-title {
+      background: #fce7e7;
+      border-left: 4px solid #dc2626;
+      margin-top: 20px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      color: #b91c1c;
+    }
+
+    /* BODY paragraphs */
+    .summary-panel p {
+      margin-bottom: 12px;
+      color: #1e293b;
+      line-height: 1.6;
       font-size: 15px;
     }
 
-    .summary-content h4.section-title {
-      margin-top: 20px;
-      padding: 6px 10px;
-      font-size: 17px;
-      font-weight: 700;
-      color: #000000;
-      background-color: #e2e8f0; /* Light gray background */
-      border-left: 4px solid #2563eb; /* Blue accent bar */
-      border-radius: 6px;
-    }
-
-
-    .summary-content p {
-      margin-bottom: 12px;
-    }
-
     .coauthor-section {
-      margin-top: 25px;
+      margin-top: 20px;
     }
 
     .coauthor-item {
@@ -99,217 +103,133 @@
       background: #e0e7ff;
     }
 
-    /* Right panel */
     .graph-panel {
-      background: white;
+      background:#fff;
       border-radius: 18px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.08);
       overflow: hidden;
-      position: relative;
     }
 
     #graph-container {
       width: 100%;
       height: 100%;
     }
-
-    /* Scrollbar styling */
-    .summary-panel::-webkit-scrollbar {
-      width: 8px;
-    }
-    .summary-panel::-webkit-scrollbar-thumb {
-      background-color: #cbd5e1;
-      border-radius: 10px;
-    }
-    .summary-panel::-webkit-scrollbar-thumb:hover {
-      background-color: #94a3b8;
-    }
-
-    @media (max-width: 1000px) {
-      .main-container {
-        grid-template-columns: 1fr;
-        height: auto;
-      }
-      .graph-panel {
-        height: 500px;
-      }
-    }
   </style>
 </head>
 
 <body>
 
-<header style="
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:15px 40px;
-    background-color:#2563eb;
-    color:white;
-    position:sticky;
-    top:0;
-    z-index:100;
-">
+<header>
+    <div>📄 Paper Summary & Author Graph</div>
 
-    <!-- LEFT SIDE: Page title -->
-    <div style="font-size:20px; font-weight:600;">
-      📄 Paper Summary & Author Graph
+    <div style="display:flex; gap:15px;">
+        <button onclick="window.location.href='/main'" style="background:white; color:#2563eb; border:none; padding:8px 15px; border-radius:8px; font-weight:600;">New Search</button>
+        <button onclick="window.location.href='/change-password'" style="background:white; color:#2563eb; border:none; padding:8px 15px; border-radius:8px; font-weight:600;">Change Password</button>
+        <button onclick="window.location.href='/logout-confirm'" style="background:#ef4444; color:white; border:none; padding:8px 15px; border-radius:8px; font-weight:600;">Logout</button>
     </div>
-
-    <!-- RIGHT SIDE: All 3 buttons -->
-    <div style="display:flex; align-items:center; gap:15px;">
-
-        <!-- New Search -->
-        <button onclick="window.location.href='/main'"
-                style="background:white; color:#2563eb; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            New Search
-        </button>
-
-        <!-- Change Password -->
-        <button onclick="window.location.href='/change-password'"
-                style="background:white; color:#2563eb; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            Change Password
-        </button>
-
-        <!-- Logout -->
-        <button onclick="window.location.href='/logout-confirm'"
-                style="background:#ef4444; color:white; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            Logout
-        </button>
-
-    </div>
-
 </header>
 
 <div class="main-container">
-  <!-- LEFT PANEL -->
-  <div class="summary-panel">
-    <h2 th:text="${title}">Paper Title</h2>
 
-    <h3>🧾 Summary</h3>
-    <!-- <div class="summary-content"
-         th:utext="${#strings.replace(summary, '## ', '<h4 class=&quot;section-title&quot;>').replace('\n', '</h4><p>') + '</p>'}">
-    </div> -->
-    <div class="summary-content"
-        th:utext="${#strings.replace(summary, '## ', '<h4 class=&quot;section-title&quot;>') 
-                    .replace('\r\n', '</h4><p>') 
-                    .replace('\n', '</h4><p>') + '</p>'}">
+    <!-- LEFT PANEL -->
+    <div class="summary-panel">
+        <h2 th:text="${title}">Paper Title</h2>
+
+        <p class="paper-id"><strong>Paper ID:</strong> <span th:text="${paperId}">ID</span></p>
+
+        <h3>🧾 Summary</h3>
+
+        <!-- RENDER SUMMARY SECTIONS -->
+        <div class="summary-content">
+            <div th:each="sec : ${sections}">
+                <h4 th:if="${sec.heading != ''}" class="section-title" th:text="${sec.heading}"></h4>
+                <p th:text="${sec.body}"></p>
+            </div>
+        </div>
+
+        <div th:if="${paper != null and paper.authors != null and !#lists.isEmpty(paper.authors)}" class="coauthor-section">
+            <h3>👩‍🔬 Coauthors</h3>
+            <div th:each="author : ${paper.authors}" class="coauthor-item" th:text="${author.displayName}"></div>
+        </div>
     </div>
 
+    <!-- RIGHT PANEL -->
+    <div class="graph-panel">
 
-    <div th:if="${paper != null and paper.authors != null and !#lists.isEmpty(paper.authors)}" class="coauthor-section">
-      <h3>👩‍🔬 Coauthors</h3>
-      <div th:each="author : ${paper.authors}" class="coauthor-item"
-           th:text="${author.displayName}">Coauthor Name</div>
+        <div th:if="${error}" style="background:#fee2e2; color:#b91c1c; padding:14px; margin:25px; border-radius:12px; text-align:center;">
+            <span th:text="${error}"></span>
+        </div>
+
+        <div id="graph-container" th:if="${error == null}"></div>
     </div>
-  </div>
-
-  <!-- RIGHT PANEL -->
-  <div class="graph-panel">
-       <!-- friendly error -->
-       <div th:if="${error}"
-       style="background:#fee2e2; color:#b91c1c; padding:14px;
-              border-radius:12px; margin:25px;
-              text-align:center; font-size:15px; font-weight:600;">
-      <span th:text="${error}"></span>
-  </div>
-  
-
-
-<!-- container still exists -->
-<div id="graph-container"
-  th:if="${error == null}">
-</div>
 
 </div>
 
+
+<!-- VIS NETWORK SCRIPT (unchanged) -->
 <script th:inline="javascript">
 /*<![CDATA[*/
 document.addEventListener("DOMContentLoaded", function () {
-  let graphData = /*[[${graphJson}]]*/ '{"nodes":[],"edges":[]}';
-  if (typeof graphData === "string") graphData = JSON.parse(graphData);
 
-  const nodes = graphData.nodes.map(n => {
-    const fullLabel = n.data.label;
-    const shortLabel = fullLabel.split(" ").slice(0, 3).join(" ") +
-      (fullLabel.split(" ").length > 3 ? "…" : "");
-    if (n.data.type === 'paper') {
-      return {
-        id: n.data.id,
-        label: shortLabel,
-        title: fullLabel,
-        shape: 'box',
-        color: { background: '#2563eb', border: '#1e3a8a' },
-        font: { color: 'white', size: 16, face: 'Inter', bold: true },
-        widthConstraint: { maximum: 200 },
-        margin: 10,
-        type: n.data.type
-      };
-    } else {
-      return {
-        id: n.data.id,
-        label: n.data.label,
-        shape: 'circle',
-        color: { background: '#f1f5f9', border: '#475569' },
-        font: { color: '#111827', size: 14, face: 'Inter' },
-        type: n.data.type
-      };
-    }
-  });
+    let raw = /*[[${graphJson}]]*/ '{"nodes":[],"edges":[]}';
 
-  const edges = graphData.edges.map(e => ({
-    from: e.data.source,
-    to: e.data.target,
-    color: { color: '#94a3b8' },
-    width: 2,
-    smooth: { type: 'dynamic' }
-  }));
+    if (typeof raw === "string") raw = JSON.parse(raw);
 
-  const container = document.getElementById('graph-container');
-  const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+    const visNodes = raw.nodes.map(n => {
+        const d = n.data;
+        const full = d.label ?? "";
+        const short = full.split(" ").slice(0, 3).join(" ") + (full.split(" ").length > 3 ? "…" : "");
 
-  const options = {
-    layout: { improvedLayout: true },
-    physics: {
-      solver: 'forceAtlas2Based',
-      forceAtlas2Based: {
-        gravitationalConstant: -60,
-        springLength: 200,
-        springConstant: 0.05
-      },
-      stabilization: { iterations: 250 },
-    },
-    nodes: { shadow: true, borderWidth: 2 },
-    edges: { shadow: false },
-    interaction: {
-      hover: true,
-      tooltipDelay: 120,
-      zoomView: true,
-      dragNodes: true
-    }
-  };
+        if (d.type === "paper") {
+            return {
+                id: d.id,
+                label: short,
+                title: full,
+                shape: "box",
+                color: { background: "#2563eb", border: "#1e3a8a" },
+                font: { color: "white", size: 16, face: "Inter", bold: true },
+                type: d.type
+            };
+        }
+        return {
+            id: d.id,
+            label: full,
+            shape: "circle",
+            color: { background: "#f1f5f9", border: "#475569" },
+            font: { color: "#111827", size: 14, face: "Inter" },
+            type: d.type
+        };
+    });
 
-  const network = new vis.Network(container, data, options);
+    const visEdges = raw.edges.map(e => ({
+        id: e.data.id,
+        from: e.data.source,
+        to: e.data.target,
+        color: { color: "#94a3b8" },
+        width: 2,
+        smooth: { type: "dynamic" }
+    }));
 
-  network.once("stabilizationIterationsDone", () => network.fit({ animation: true }));
+    const container = document.getElementById("graph-container");
+    if (!container) return;
 
-  network.on("click", params => {
-    if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0];
-      const node = data.nodes.get(nodeId);
-      if (node.type === "author") {
-        window.location.href = '/professor-summary?id=' + node.id;
-      }
-    }
-  });
+    const data = { nodes: new vis.DataSet(visNodes), edges: new vis.DataSet(visEdges) };
+
+    const options = {
+        layout: { improvedLayout: true },
+        physics: {
+            solver: "forceAtlas2Based",
+            forceAtlas2Based: { gravitationalConstant: -60, springLength: 200, springConstant: 0.05 },
+            stabilization: { iterations: 250 }
+        }
+    };
+
+    const network = new vis.Network(container, data, options);
+
+    network.once("stabilizationIterationsDone", () => network.fit({ animation: true }));
 });
 /*]]>*/
 </script>
+
 </body>
 </html>

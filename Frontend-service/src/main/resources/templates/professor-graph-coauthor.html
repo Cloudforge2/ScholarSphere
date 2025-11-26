@@ -75,7 +75,7 @@
 </head>
 <body>
 
-  <header style="
+ <header style="
     display:flex;
     justify-content:space-between;
     align-items:center;
@@ -87,37 +87,67 @@
     z-index:100;
 ">
 
-    <!-- LEFT SIDE: Page title -->
+    <!-- LEFT -->
     <div style="font-size:20px; font-weight:600;">
-      👥 Coauthor Network Visualization
+        Professor Graph Visualization
     </div>
 
-    <!-- RIGHT SIDE: All 3 buttons -->
+    <!-- RIGHT -->
     <div style="display:flex; align-items:center; gap:15px;">
 
-        <!-- New Search -->
-        <button onclick="window.location.href='/main'"
-                style="background:white; color:#2563eb; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            New Search
-        </button>
+        <!-- 📘 PAPER GRAPH -->
+        <a th:href="@{/professor-graph(id=${profId})}">
+            <button style="background:white; color:#2563eb; border:none;
+                           padding:8px 15px; border-radius:8px;
+                           font-weight:600; cursor:pointer;">
+                Paper Graph
+            </button>
+        </a>
 
-        <!-- Change Password -->
-        <button onclick="window.location.href='/change-password'"
-                style="background:white; color:#2563eb; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            Change Password
-        </button>
+        <!-- 🤝 COAUTHOR GRAPH -->
+        <a th:href="@{/coauthor-graph(id=${profId})}">
+            <button style="background:white; color:#2563eb; border:none;
+                           padding:8px 15px; border-radius:8px;
+                           font-weight:600; cursor:pointer;">
+                Coauthor Graph
+            </button>
+        </a>
 
-        <!-- Logout -->
-        <button onclick="window.location.href='/logout-confirm'"
-                style="background:#ef4444; color:white; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            Logout
-        </button>
+        <!-- 🧠 TOPIC GRAPH -->
+        <a th:href="@{/topic-graph(id=${profId}, name=${professorName})}">
+            <button style="background:white; color:#2563eb; border:none;
+                           padding:8px 15px; border-radius:8px;
+                           font-weight:600; cursor:pointer;">
+                Topic Graph
+            </button>
+        </a>
+
+        <!-- 🔍 New Search -->
+        <a th:href="@{/main}">
+            <button style="background:white; color:#2563eb; border:none;
+                           padding:8px 15px; border-radius:8px;
+                           font-weight:600; cursor:pointer;">
+                New Search
+            </button>
+        </a>
+
+        <!-- 🔑 Change Password -->
+        <a th:href="@{/change-password}">
+            <button style="background:white; color:#2563eb; border:none;
+                           padding:8px 15px; border-radius:8px;
+                           font-weight:600; cursor:pointer;">
+                Change Password
+            </button>
+        </a>
+
+        <!-- 🔴 Logout -->
+        <a th:href="@{/logout-confirm}">
+            <button style="background:#ef4444; color:white; border:none;
+                           padding:8px 15px; border-radius:8px;
+                           font-weight:600; cursor:pointer;">
+                Logout
+            </button>
+        </a>
 
     </div>
 

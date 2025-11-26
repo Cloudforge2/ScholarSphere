@@ -13,16 +13,6 @@
       color: #1f2937;
     }
 
-    header {
-      background-color: #2563eb;
-      color: white;
-      padding: 20px 40px;
-      font-size: 24px;
-      font-weight: 700;
-      text-align: center;
-      letter-spacing: 0.5px;
-    }
-
     .main-container {
       display: flex;
       flex-wrap: wrap;
@@ -39,38 +29,27 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.1);
       flex: 1 1 45%;
       min-width: 380px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 12px 35px rgba(0,0,0,0.15);
-    }
-
-    h2 {
-      color: #1e293b;
-      margin-bottom: 10px;
-    }
-
-    h3 {
-      margin-top: 0;
-      color: #1d4ed8;
-      font-weight: 700;
     }
 
     .summary-content {
       background: #e0f2fe;
-      padding: 20px;
+      padding: 15px 20px;
       border-radius: 10px;
-      line-height: 1.7;
-      font-size: 15.5px;
+      font-size: 16px;
       color: #374151;
-      white-space: pre-wrap;
     }
 
     .summary-content h3 {
-      margin-bottom: 10px;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      font-size: 17px;
       color: #1d4ed8;
+      font-weight: 700;
+    }
+
+    .summary-content p {
+      margin: 0 0 12px 0;
+      line-height: 1.6;
     }
 
     .papers-section table {
@@ -82,7 +61,6 @@
 
     .papers-section th, .papers-section td {
       padding: 10px 8px;
-      text-align: left;
       border-bottom: 1px solid #e5e7eb;
     }
 
@@ -91,32 +69,12 @@
       color: #1e3a8a;
       font-weight: 700;
     }
-
-    .papers-section tr:hover {
-      background: #f9fafb;
-    }
-
-    .error-message {
-      color: #dc2626;
-      font-weight: 600;
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 1000px) {
-      .main-container {
-        flex-direction: column;
-        padding: 20px;
-      }
-      .card {
-        width: 100%;
-      }
-    }
   </style>
 </head>
 
 <body>
 
-  <header style="
+<header style="
     display:flex;
     justify-content:space-between;
     align-items:center;
@@ -125,85 +83,75 @@
     color:white;
     position:sticky;
     top:0;
-    z-index:100;
-">
-
-    <!-- LEFT SIDE: Page title -->
-    <div style="font-size:20px; font-weight:600;">
-      👨‍🏫 Professor Summary
-    </div>
-
-    <!-- RIGHT SIDE: All 3 buttons -->
-    <div style="display:flex; align-items:center; gap:15px;">
-
-        <!-- New Search -->
-        <button onclick="window.location.href='/main'"
-                style="background:white; color:#2563eb; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            New Search
-        </button>
-
-        <!-- Change Password -->
-        <button onclick="window.location.href='/change-password'"
-                style="background:white; color:#2563eb; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            Change Password
-        </button>
-
-        <!-- Logout -->
-        <button onclick="window.location.href='/logout-confirm'"
-                style="background:#ef4444; color:white; border:none;
-                       padding:8px 15px; border-radius:8px;
-                       font-weight:600; cursor:pointer;">
-            Logout
-        </button>
-
-    </div>
-
+    z-index:100;">
+  <div style="font-size:20px; font-weight:600;">
+    <span th:text="${author}">Professor Name</span>
+  </div>
+  <div style="display:flex; gap:15px;">
+      <button onclick="window.location.href='/main'" style="background:white; color:#2563eb; border:none; padding:8px 15px; border-radius:8px; font-weight:600;">
+          New Search
+      </button>
+      <button onclick="window.location.href='/change-password'" style="background:white; color:#2563eb; border:none; padding:8px 15px; border-radius:8px; font-weight:600;">
+          Change Password
+      </button>
+      <button onclick="window.location.href='/logout-confirm'" style="background:#ef4444; color:white; border:none; padding:8px 15px; border-radius:8px; font-weight:600;">
+          Logout
+      </button>
+  </div>
 </header>
 
-  <div class="main-container">
+<div class="main-container">
 
-    <!-- LEFT CARD: Summary -->
-    <div class="card">
-      <div th:if="${error}">
-        <p class="error-message" th:text="${error}"></p>
-      </div>
+  <!-- SUMMARY CARD -->
+  <div class="card">
+    <h2 th:text="'Prof. ' + ${author}"></h2>
 
-      <div th:if="${author}">
-        <h2 th:text="'Prof. ' + ${author}"></h2>
-        <p><strong>Papers Analyzed:</strong> <span th:text="${papers_analyzed_count}">0</span></p>
+    <p><strong>ORCID:</strong>
+      <a th:href="'https://orcid.org/' + ${orcid}" th:text="${orcid}" target="_blank"
+         style="color:#2563eb;"></a>
+    </p>
 
-        <div class="summary-content" th:if="${summary}">
-          <h3>🧠 Research Summary</h3>
-          <p th:utext="${summary}">Research summary will appear here.</p>
-        </div>
+    <p><strong>Papers Analyzed:</strong>
+      <span th:text="${papers_analyzed_count}">0</span>
+    </p>
+
+    <div class="summary-content">
+      <h3>🧠 Research Summary</h3>
+
+      <!-- LOOP THROUGH THE SECTIONS -->
+      <div th:each="sec : ${sections}">
+        
+        <!-- Heading only if exists -->
+        <h3 th:if="${sec.heading != ''}" th:text="${sec.heading}"></h3>
+        
+        <!-- Body paragraph -->
+        <p th:text="${sec.body}"></p>
       </div>
     </div>
-
-    <!-- RIGHT CARD: Papers -->
-    <div class="card papers-section" th:if="${papers_sample}">
-      <h3>📚 Sample Papers</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Year</th>
-            <th>Citations</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr th:each="paper : ${papers_sample}">
-            <td th:text="${paper.title != null ? paper.title : 'Untitled'}"></td>
-            <td th:text="${paper.year}"></td>
-            <td th:text="${paper.citations}"></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
   </div>
+
+  <!-- SAMPLE PAPERS -->
+  <div class="card papers-section" th:if="${papers_sample}">
+    <h3>📚 Sample Papers</h3>
+    <table>
+      <thead>
+      <tr>
+        <th>Title</th>
+        <th>Year</th>
+        <th>Citations</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr th:each="paper : ${papers_sample}">
+        <td th:text="${paper.title}"></td>
+        <td th:text="${paper.year}"></td>
+        <td th:text="${paper.citations}"></td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
 </body>
 </html>
