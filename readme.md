@@ -1,5 +1,6 @@
-Scholar-Sphere — Installation & Architecture Guide
+Scholar-Sphere 
 
+Accesible at http://13.233.98.140:8080
 
 
 # 1. Overview
