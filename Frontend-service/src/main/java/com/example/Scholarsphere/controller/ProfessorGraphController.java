@@ -39,7 +39,7 @@ public class ProfessorGraphController {
     public ProfessorGraphController() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(2000);   // fail fast if backend is down
-        factory.setReadTimeout(20000);      // allow Scrappy to fetch OpenAlex
+        factory.setReadTimeout(40000);      // allow Scrappy to fetch OpenAlex
         this.restTemplate = new RestTemplate(factory);
     }
 

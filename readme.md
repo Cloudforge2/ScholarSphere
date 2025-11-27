@@ -1214,7 +1214,58 @@ Below are screenshots of the main functionalities of our application.
 We have SETUP.md describing the initial project setup in brief. We also have SECURITY.md and SECURITY_FIX_SUMMARY.md describing what major changes were made in project to mitigate major security threats.
 
 
+### Deployment
+ScholarSphere is deployed on Amazon Web Services (AWS) using a single Ubuntu 22.04 EC2 instance, with all microservices orchestrated via Docker Compose.
 
+# Live Deployment
+The application is accessible at the following URLs:
+
+  Frontend UI:
+  http://13.233.98.140:8080
+  Graph Service:
+  http://13.233.98.140:8082
+  Scrappy Service:
+  http://13.233.98.140:8083
+  Summary Service:
+  http://13.233.98.140:8085
+  Neo4j Browser:
+  http://13.233.98.140:7474
+
+# Deployment Summary
+Deployment was performed entirely via the AWS CLI.
+
+AWS Resources Used
+  EC2 Instance:
+    Type: t3.large
+    AMI: Ubuntu 22.04 (AMI ID: ami-0518579c1bced7f50)
+    Public IP: 13.233.98.140
+
+  Security Group: scholarsphere-sg
+    Open ports: 22, 8080, 8082, 8083, 8085, 7474, 7687
+
+  Key Pair: scholarsphere-key.pem (for SSH access)
+
+# Deployment Workflow (High-Level)
+
+  Configure AWS CLI
+
+  Create EC2 key pair and security group
+
+  Launch EC2 instance
+
+  SSH into the instance
+    ssh -i scholarsphere-key.pem ubuntu@13.233.98.140
+
+  Install Docker, Docker Compose, and Git
+
+  Clone the repository
+
+  Configure .env variables
+
+  Run the application:
+    docker-compose up --build -d
+
+The EC2 instance now runs all services (Frontend, Graph, Scrappy, Summary, MySQL, Neo4j) in containers.
 
 
 
