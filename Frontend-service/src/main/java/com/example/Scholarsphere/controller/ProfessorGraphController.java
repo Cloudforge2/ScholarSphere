@@ -330,9 +330,12 @@ public String paperSummary(@RequestParam(required = false) String title,
         if (id != null && !id.isEmpty()) {
             paperId = id;
             System.out.println("✅ Using provided paper ID: " + paperId);
+
             paper.setId(paperId);
             paper.setTitle(title != null ? title : "Unknown Paper");
+
         } else if (title != null && !title.isEmpty()) {
+
             String url = PAPER_BY_TITLE_URL + URLEncoder.encode(title, StandardCharsets.UTF_8);
             System.out.println("DEBUG: Fetching paper metadata from: " + url);
 
@@ -341,14 +344,19 @@ public String paperSummary(@RequestParam(required = false) String title,
             if (papers != null && papers.length > 0) {
                 paper = papers[0];
                 paperId = paper.getId();
+
                 System.out.println("DEBUG: Got paper ID from service: " + paperId);
+                System.out.println("DEBUG: DOI fetched = " + paper.getDoi());
+
             } else {
                 throw new RuntimeException("No paper found for title: " + title);
             }
+
         } else {
             throw new IllegalArgumentException("Either 'title' or 'id' parameter is required.");
         }
-        
+
+
         // 2️⃣ Fetch paper summary from Summary Service (FastAPI)
         String summaryText = "";
         try {
@@ -364,55 +372,76 @@ public String paperSummary(@RequestParam(required = false) String title,
             System.out.println("DEBUG: Fetching paper summary from: " + summaryUrl);
 
             Map<String, Object> summaryMap = restTemplate.getForObject(summaryUrl, Map.class);
+            if (summaryMap != null) {
 
-            if (summaryMap != null && summaryMap.containsKey("summary")) {
-                summaryText = (String) summaryMap.getOrDefault("summary", "No summary available.");
+    // 1️⃣ Summary text
+    summaryText = (String) summaryMap.getOrDefault("summary", "No summary available.");
 
-                // PRINT EXACT SUMMARY RAW TEXT
-                System.out.println("\n================ SUMMARY RESPONSE ================");
-                System.out.println(summaryText);
-                System.out.println("=================================================\n");
+    // print raw summary
+    System.out.println("\n================ SUMMARY RESPONSE ================");
+    System.out.println(summaryText);
+    System.out.println("=================================================\n");
 
-            } else {
-                System.err.println("⚠️ No summary found for paper ID: " + paperId);
-                summaryText = "No summary available.";
-            }
+    // 2️⃣ Extract paper_info fields (including DOI)
+    Object paperInfoObj = summaryMap.get("paper_info");
+    if (paperInfoObj instanceof Map<?, ?> info) {
+
+        if (info.get("doi") != null) {
+            paper.setDoi((String) info.get("doi"));
+            System.out.println("DEBUG: DOI received = " + paper.getDoi());
+        }
+
+        if (info.get("year") != null) {
+            paper.setYear((Integer) info.get("year"));
+        }
+
+        if (info.get("venue") != null) {
+            paper.setVenue((String) info.get("venue"));
+        }
+
+        if (info.get("abstract") != null) {
+            paper.setAbstractText((String) info.get("abstract"));
+        }
+    }
+
+} else {
+    System.err.println("⚠️ No summary found for paper ID: " + paperId);
+    summaryText = "No summary available.";
+}
+
 
         } catch (Exception e) {
             System.err.println("⚠️ Could not fetch summary: " + e.getMessage());
             summaryText = "Summary unavailable — please try again later.";
         }
+
+
+        // 3️⃣ Split summary into sections for HTML
         List<Map<String, String>> sections = new ArrayList<>();
 
-// split by each "##" occurrence
-String[] parts = summaryText.split("##");
+        String[] parts = summaryText.split("##");
+        Pattern pattern = Pattern.compile("^\\s*([A-Za-z0-9()\\-/ ]+?)\\s+(.*)$", Pattern.DOTALL);
 
-Pattern pattern = Pattern.compile("^\\s*([A-Za-z0-9()\\-/ ]+?)\\s+(.*)$", Pattern.DOTALL);
+        for (String part : parts) {
+            part = part.trim();
+            if (part.isEmpty()) continue;
 
-for (String part : parts) {
-    part = part.trim();
-    if (part.isEmpty()) continue;
+            Matcher m = pattern.matcher(part);
 
-    Matcher m = pattern.matcher(part);
+            if (m.matches()) {
+                sections.add(Map.of(
+                        "heading", m.group(1).trim(),
+                        "body", m.group(2).trim()
+                ));
+            } else {
+                sections.add(Map.of(
+                        "heading", "",
+                        "body", part.trim()
+                ));
+            }
+        }
 
-    if (m.matches()) {
-        String heading = m.group(1).trim();
-        String body = m.group(2).trim();
-
-        sections.add(Map.of(
-                "heading", heading,
-                "body", body
-        ));
-    } else {
-        // If it doesn't match, treat as body-only text
-        sections.add(Map.of(
-                "heading", "",
-                "body", part.trim()
-        ));
-    }
-}
-
-model.addAttribute("sections", sections);
+        model.addAttribute("sections", sections);
 
 
         // 4️⃣ Fetch authors from graph-service
@@ -432,16 +461,19 @@ model.addAttribute("sections", sections);
             model.addAttribute("error", "Author graph is unavailable right now.");
         }
 
+
         // 5️⃣ Construct Graph Data
         List<Map<String, Object>> nodes = new ArrayList<>();
         List<Map<String, Object>> edges = new ArrayList<>();
 
+        // paper node
         nodes.add(Map.of("data", Map.of(
                 "id", paperId,
                 "label", paper.getTitle(),
                 "type", "paper"
         )));
 
+        // author nodes
         if (authors != null) {
             for (Professor author : authors) {
                 nodes.add(Map.of("data", Map.of(
@@ -460,10 +492,15 @@ model.addAttribute("sections", sections);
         ObjectMapper mapper = new ObjectMapper();
         String graphJson = mapper.writeValueAsString(Map.of("nodes", nodes, "edges", edges));
 
+
+        // 6️⃣ Add data to HTML model
         model.addAttribute("graphJson", graphJson);
         model.addAttribute("paper", paper);
         model.addAttribute("title", paper.getTitle());
         model.addAttribute("paperId", paperId);
+
+        // ⭐ NEW: Add DOI to model
+        model.addAttribute("doi", paper.getDoi());
 
     } catch (Exception e) {
         e.printStackTrace();

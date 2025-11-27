@@ -135,7 +135,25 @@
     <div class="summary-panel">
         <h2 th:text="${title}">Paper Title</h2>
 
-        <p class="paper-id"><strong>Paper ID:</strong> <span th:text="${paperId}">ID</span></p>
+<!-- ⭐ DOI Section -->
+<p class="paper-id" th:if="${doi}">
+    <strong>DOI:</strong>
+    <a th:href="'https://doi.org/' + ${doi}"
+       th:text="${doi}"
+       target="_blank"
+       style="color:#2563eb; font-weight:600; text-decoration:none;">
+    </a>
+</p>
+
+<p class="paper-id" th:if="${doi == null}">
+    <strong>DOI:</strong> Not available
+</p>
+
+<!-- Paper ID -->
+<p class="paper-id">
+    <strong>Paper ID:</strong> 
+    <span th:text="${paperId}">ID</span>
+</p>
 
         <h3>🧾 Summary</h3>
 

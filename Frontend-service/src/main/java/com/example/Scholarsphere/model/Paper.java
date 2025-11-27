@@ -12,10 +12,11 @@ import java.util.List;
 public class Paper {
     private String id;
     private String title;
-    private String venue;           // add this
-    private int year;               // add this
-    private String abstractText;    // add this
+    private String venue;
+    private String doi;          // FIXED: String, not string
+    private int year;
+    private String abstractText;
 
-    // To support bidirectional link in controllers
+    // Bidirectional link
     private List<Professor> authors;
 }
