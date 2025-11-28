@@ -6,10 +6,10 @@ Accesible at http://13.233.98.140:8080
 Team members: Annu(annu2024@iisc.ac.in), Kunal(kunalc@iisc.ac.in), Paul(paullhungdim@iisc.ac.in), Ikshita(ikshitap@iisc.ac.in)
 
 
-This project was done as a part of the DS252 Introduction to Cloud Computing (Aug, 2025) course offereed by CDS department of IISC Banglore.
+This project was done as a part of the DS252 Introduction to Cloud Computing (Aug, 2025) course offered by CDS department of IISC Banglore.
 
 
-We have taken a good amount of help from AI agents for development of this course. We used below listed AI agents and this was our experience and findings:
+We have taken a good amount of help from AI agents for development of this project. We used below listed AI agents and this was our experience and findings:
 
 1. GPT 5 : Good for code chunk generation and provide ideas, good for documentation.​
 2. Claude : Good for code debugging ( Claude Sonnet 4.5)​, performance degrades as context length increases​.
